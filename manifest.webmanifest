@@ -1,0 +1,33 @@
+{
+  "id": "./?app=mp3-splitter",
+  "name": "MP3 Splitter — Lossless Audio Cutter",
+  "short_name": "MP3 Splitter",
+  "description": "Fast, 100% offline in-browser MP3 splitter. No upload, zero quality loss, precise frame cuts.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#6750A4",
+  "background_color": "#FEF7FF",
+  "categories": ["music", "audio", "utilities"],
+  "icons": [
+    {
+      "src": "./icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
