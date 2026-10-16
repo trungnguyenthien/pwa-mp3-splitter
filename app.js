@@ -26,16 +26,17 @@ const state = {
   parts: [], // [{ id, name, start, end, status: 'idle'|'working'|'done'|'error', blobUrl, lastBlob }]
   suggestions: [], // [{ id, name, start, end, duration, selected }]
   settings: {
-    silenceDb: -45,
-    minSilenceSec: 1.5,
-    minPartSec: 30,
+    silenceDb: -35,
+    minSilenceSec: 0.25,
+    minPartSec: 45,
   },
   ui: {
     loading: false,
     progress: 0,
     loadingMessage: '',
     dialog: null, // 'auto' | 'range' | 'ios' | null
-    previewId: null, // part id or 'whole' or null
+    previewId: null, // part id, suggestion id, or 'whole'
+    previewBlobUrl: null,
     currentTime: 0,
     isWholePlaying: false,
   },
@@ -80,14 +81,28 @@ function initElements() {
     btnChooseFile: document.getElementById('btnChooseFile'),
     fileInfoSection: document.getElementById('fileInfoSection'),
     btnChangeFile: document.getElementById('btnChangeFile'),
+    btnOpenFileInfo: document.getElementById('btnOpenFileInfo'),
     fileNameDisplay: document.getElementById('fileNameDisplay'),
     statDuration: document.getElementById('statDuration'),
     statBitrate: document.getElementById('statBitrate'),
     statSampleRate: document.getElementById('statSampleRate'),
     statSize: document.getElementById('statSize'),
 
+    // File Info Dialog Elements
+    fileInfoDialog: document.getElementById('fileInfoDialog'),
+    btnCloseFileInfoDialog: document.getElementById('btnCloseFileInfoDialog'),
+    btnDismissFileInfo: document.getElementById('btnDismissFileInfo'),
+    infoModalFileName: document.getElementById('infoModalFileName'),
+    infoModalDuration: document.getElementById('infoModalDuration'),
+    infoModalSize: document.getElementById('infoModalSize'),
+    infoModalBitrate: document.getElementById('infoModalBitrate'),
+    infoModalSampleRate: document.getElementById('infoModalSampleRate'),
+    infoModalFrames: document.getElementById('infoModalFrames'),
+    infoModalFrameDuration: document.getElementById('infoModalFrameDuration'),
+
     // Loading
     loadingSection: document.getElementById('loadingSection'),
+    loadingTitle: document.getElementById('loadingTitle'),
     loadingMessage: document.getElementById('loadingMessage'),
     loadingPercent: document.getElementById('loadingPercent'),
     loadingProgressBar: document.getElementById('loadingProgressBar'),
@@ -131,6 +146,9 @@ function initElements() {
     // Advanced settings in Auto dialog
     settingsAccordion: document.getElementById('settingsAccordion'),
     btnToggleSettings: document.getElementById('btnToggleSettings'),
+    btnPresetMusic: document.getElementById('btnPresetMusic'),
+    btnPresetSpeech: document.getElementById('btnPresetSpeech'),
+    btnPresetLong: document.getElementById('btnPresetLong'),
     inputSilenceDb: document.getElementById('inputSilenceDb'),
     valSilenceDb: document.getElementById('valSilenceDb'),
     inputMinSilence: document.getElementById('inputMinSilence'),
@@ -171,7 +189,7 @@ function initElements() {
 function initWorker() {
   try {
     if (window.Worker && window.location.protocol !== 'file:') {
-      mp3Worker = new Worker('./mp3-worker.js?v=4');
+      mp3Worker = new Worker('./mp3-worker.js?v=11');
       mp3Worker.onmessage = handleWorkerMessage;
       mp3Worker.onerror = (err) => {
         console.warn('Worker error, switching to in-thread processing:', err);
@@ -190,13 +208,26 @@ function handleWorkerMessage(event) {
   const { type, index, progress, id, partName, arrayBuffer, error } = event.data;
 
   if (type === 'indexProgress') {
-    updateLoadingProgress(progress, 'Indexing MP3 frames...');
+    const scaled = Math.min(50, Math.round(15 + progress * 0.35));
+    updateLoadingProgress(scaled, 'Indexing audio frames (lossless)...');
   } else if (type === 'indexComplete') {
-    onIndexComplete(index);
+    try {
+      onIndexComplete(index);
+    } catch (err) {
+      console.error('Error handling indexComplete:', err);
+      hideLoading();
+      if (elements.dropzone) elements.dropzone.classList.remove('hidden');
+      if (elements.fileInput) elements.fileInput.disabled = false;
+      showSnackbar('Error processing audio: ' + err.message);
+    }
   } else if (type === 'sliceComplete') {
     onSliceComplete(id, partName, arrayBuffer);
   } else if (type === 'error') {
     hideLoading();
+    if (!state.index) {
+      elements.dropzone.classList.remove('hidden');
+    }
+    if (elements.fileInput) elements.fileInput.disabled = false;
     showSnackbar('Error: ' + error);
   }
 }
@@ -312,6 +343,9 @@ function initEvents() {
   // Dialog triggers
   if (elements.btnOpenAuto) elements.btnOpenAuto.addEventListener('click', openAutoDialog);
   if (elements.btnOpenRange) elements.btnOpenRange.addEventListener('click', openRangeDialog);
+  if (elements.btnOpenFileInfo) elements.btnOpenFileInfo.addEventListener('click', openFileInfoDialog);
+  if (elements.btnCloseFileInfoDialog) elements.btnCloseFileInfoDialog.addEventListener('click', () => closeDialog());
+  if (elements.btnDismissFileInfo) elements.btnDismissFileInfo.addEventListener('click', () => closeDialog());
 
   // Auto Dialog actions
   if (elements.btnCloseAutoDialog) elements.btnCloseAutoDialog.addEventListener('click', () => closeDialog());
@@ -327,11 +361,55 @@ function initEvents() {
     });
   }
 
+  // Detection Presets
+  function applyDetectionPreset(db, minSil, minPart, activeBtn) {
+    state.settings.silenceDb = db;
+    state.settings.minSilenceSec = minSil;
+    state.settings.minPartSec = minPart;
+
+    if (elements.inputSilenceDb) {
+      elements.inputSilenceDb.value = db;
+      elements.valSilenceDb.textContent = `${db} dB`;
+    }
+    if (elements.inputMinSilence) {
+      elements.inputMinSilence.value = minSil;
+      elements.valMinSilence.textContent = `${minSil}s`;
+    }
+    if (elements.inputMinPart) {
+      elements.inputMinPart.value = minPart;
+      elements.valMinPart.textContent = `${minPart}s`;
+    }
+
+    [elements.btnPresetMusic, elements.btnPresetSpeech, elements.btnPresetLong].forEach((btn) => {
+      if (btn) btn.classList.remove('active');
+    });
+    if (activeBtn) activeBtn.classList.add('active');
+
+    analyzeSilence();
+  }
+
+  if (elements.btnPresetMusic) {
+    elements.btnPresetMusic.addEventListener('click', () => {
+      applyDetectionPreset(-35, 0.25, 45, elements.btnPresetMusic);
+    });
+  }
+  if (elements.btnPresetSpeech) {
+    elements.btnPresetSpeech.addEventListener('click', () => {
+      applyDetectionPreset(-42, 0.80, 30, elements.btnPresetSpeech);
+    });
+  }
+  if (elements.btnPresetLong) {
+    elements.btnPresetLong.addEventListener('click', () => {
+      applyDetectionPreset(-48, 1.50, 60, elements.btnPresetLong);
+    });
+  }
+
   // Settings sliders (Real-time live analysis)
   if (elements.inputSilenceDb) {
     elements.inputSilenceDb.addEventListener('input', (e) => {
       state.settings.silenceDb = parseFloat(e.target.value);
-      elements.valSilenceDb.textContent = `${state.settings.silenceDb} dB`;
+      if (elements.valSilenceDb) elements.valSilenceDb.textContent = `${state.settings.silenceDb} dB`;
+      [elements.btnPresetMusic, elements.btnPresetSpeech, elements.btnPresetLong].forEach((b) => b && b.classList.remove('active'));
       analyzeSilence();
     });
   }
@@ -339,7 +417,7 @@ function initEvents() {
   if (elements.inputMinSilence) {
     elements.inputMinSilence.addEventListener('input', (e) => {
       state.settings.minSilenceSec = parseFloat(e.target.value);
-      elements.valMinSilence.textContent = `${state.settings.minSilenceSec}s`;
+      if (elements.valMinSilence) elements.valMinSilence.textContent = `${state.settings.minSilenceSec}s`;
       analyzeSilence();
     });
   }
@@ -347,7 +425,7 @@ function initEvents() {
   if (elements.inputMinPart) {
     elements.inputMinPart.addEventListener('input', (e) => {
       state.settings.minPartSec = parseFloat(e.target.value);
-      elements.valMinPart.textContent = `${state.settings.minPartSec}s`;
+      if (elements.valMinPart) elements.valMinPart.textContent = `${state.settings.minPartSec}s`;
       analyzeSilence();
     });
   }
@@ -414,6 +492,8 @@ function initEvents() {
         elements.playIcon.classList.remove('hidden');
         elements.pauseIcon.classList.add('hidden');
       }
+      renderParts();
+      updateSuggestionPreviewButtons();
     });
 
     elements.previewAudio.addEventListener('play', () => {
@@ -422,6 +502,8 @@ function initEvents() {
         elements.playIcon.classList.add('hidden');
         elements.pauseIcon.classList.remove('hidden');
       }
+      renderParts();
+      updateSuggestionPreviewButtons();
     });
   }
 
@@ -437,7 +519,7 @@ function initEvents() {
     }
   });
 
-  [elements.autoSplitDialog, elements.rangeDialog, elements.iosInstallModal].forEach((backdrop) => {
+  [elements.autoSplitDialog, elements.rangeDialog, elements.fileInfoDialog, elements.iosInstallModal].forEach((backdrop) => {
     if (backdrop) {
       backdrop.addEventListener('click', (e) => {
         if (e.target === backdrop) {
@@ -478,6 +560,15 @@ async function processSelectedFile(file) {
 
   stopPreview();
 
+  // Disable interactions and prevent re-upload during processing
+  if (elements.fileInput) elements.fileInput.disabled = true;
+  disableActionButtons();
+
+  // Hide dropzone, file info, and waveform cards while loading
+  elements.dropzone.classList.add('hidden');
+  elements.fileInfoSection.classList.add('hidden');
+  elements.waveformCard.classList.add('hidden');
+
   state.file = {
     name: file.name,
     size: file.size,
@@ -490,15 +581,14 @@ async function processSelectedFile(file) {
   state.ui.currentTime = 0;
 
   renderParts();
-  disableActionButtons();
 
-  showLoading('Reading MP3 file...');
+  showLoading('Reading MP3 file into memory...', `Processing "${file.name}"...`);
 
   try {
     const arrayBuffer = await file.arrayBuffer();
     state.file.buffer = arrayBuffer;
 
-    updateLoadingProgress(10, 'Indexing audio frames...');
+    updateLoadingProgress(15, 'Indexing audio frames (lossless)...');
 
     if (mp3Worker) {
       try {
@@ -520,17 +610,22 @@ async function processSelectedFile(file) {
     setTimeout(() => {
       try {
         const indexResult = parseMp3IndexDirect(state.file.buffer, (progress) => {
-          updateLoadingProgress(progress, 'Indexing audio frames...');
+          const scaled = Math.min(50, Math.round(15 + progress * 0.35));
+          updateLoadingProgress(scaled, 'Indexing audio frames (lossless)...');
         });
         onIndexComplete(indexResult);
       } catch (err) {
         hideLoading();
+        elements.dropzone.classList.remove('hidden');
+        if (elements.fileInput) elements.fileInput.disabled = false;
         showSnackbar('Error reading MP3: ' + err.message);
       }
     }, 50);
   } catch (err) {
     console.error('File read error:', err);
     hideLoading();
+    elements.dropzone.classList.remove('hidden');
+    if (elements.fileInput) elements.fileInput.disabled = false;
     showSnackbar('Failed to read file: ' + err.message);
   }
 }
@@ -538,21 +633,31 @@ async function processSelectedFile(file) {
 function onIndexComplete(index) {
   state.index = index;
 
-  elements.fileNameDisplay.textContent = state.file.name;
-  elements.statDuration.textContent = formatTime(index.duration);
-  elements.statBitrate.textContent = `${index.bitrate} kbps ${index.isVbr ? '(VBR)' : '(CBR)'}`;
-  elements.statSampleRate.textContent = `${(index.sampleRate / 1000).toFixed(1)} kHz`;
-  elements.statSize.textContent = `${(state.file.size / (1024 * 1024)).toFixed(1)} MB`;
-  elements.totalTimeDisplay.textContent = formatTime(index.duration);
-  elements.currentTimeDisplay.textContent = '00:00.0';
+  if (elements.fileNameDisplay) {
+    elements.fileNameDisplay.textContent = state.file.name;
+    elements.fileNameDisplay.title = state.file.name;
+  }
+  if (elements.statDuration) {
+    elements.statDuration.textContent = formatTime(index.duration);
+  }
+  if (elements.statBitrate) {
+    elements.statBitrate.textContent = `${index.bitrate} kbps ${index.isVbr ? '(VBR)' : '(CBR)'}`;
+  }
+  if (elements.statSampleRate) {
+    elements.statSampleRate.textContent = `${(index.sampleRate / 1000).toFixed(1)} kHz`;
+  }
+  if (elements.statSize) {
+    elements.statSize.textContent = `${(state.file.size / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  if (elements.totalTimeDisplay) {
+    elements.totalTimeDisplay.textContent = formatTime(index.duration);
+  }
+  if (elements.currentTimeDisplay) {
+    elements.currentTimeDisplay.textContent = '00:00.0';
+  }
 
-  elements.dropzone.classList.add('hidden');
-  elements.fileInfoSection.classList.remove('hidden');
-  elements.waveformCard.classList.remove('hidden');
-
-  enableActionButtons();
-
-  updateLoadingProgress(50, 'Analyzing audio waveform...');
+  // Keep cards hidden and buttons disabled until decode finishes completely
+  updateLoadingProgress(50, 'Decoding audio for waveform & silence analysis...');
   computePeaks();
 }
 
@@ -799,27 +904,36 @@ async function computePeaks() {
     }
 
     if (fullAudioBuffer) {
-      const channelData = fullAudioBuffer.getChannelData(0);
+      const numChannels = fullAudioBuffer.numberOfChannels;
+      const ch0 = fullAudioBuffer.getChannelData(0);
+      const ch1 = numChannels > 1 ? fullAudioBuffer.getChannelData(1) : null;
       const sampleRate = fullAudioBuffer.sampleRate;
       const windowSizeSamples = Math.floor(sampleRate * windowSec);
 
       for (let w = 0; w < totalWindows; w++) {
         const startSample = w * windowSizeSamples;
-        const endSample = Math.min(channelData.length, (w + 1) * windowSizeSamples);
+        const endSample = Math.min(ch0.length, (w + 1) * windowSizeSamples);
 
-        if (startSample >= channelData.length) {
+        if (startSample >= ch0.length) {
           peaks[w] = -60;
           continue;
         }
 
         let sumSquares = 0;
-        for (let s = startSample; s < endSample; s++) {
-          sumSquares += channelData[s] * channelData[s];
-        }
-
         const count = Math.max(1, endSample - startSample);
-        const rms = Math.sqrt(sumSquares / count);
-        peaks[w] = Math.max(-60, 20 * Math.log10(rms + 1e-6));
+        if (ch1) {
+          for (let s = startSample; s < endSample; s++) {
+            sumSquares += ch0[s] * ch0[s] + ch1[s] * ch1[s];
+          }
+          const rms = Math.sqrt(sumSquares / (count * 2));
+          peaks[w] = Math.max(-60, 20 * Math.log10(rms + 1e-6));
+        } else {
+          for (let s = startSample; s < endSample; s++) {
+            sumSquares += ch0[s] * ch0[s];
+          }
+          const rms = Math.sqrt(sumSquares / count);
+          peaks[w] = Math.max(-60, 20 * Math.log10(rms + 1e-6));
+        }
       }
 
       // Memory cleanup: release audio buffer reference immediately
@@ -888,9 +1002,9 @@ async function computePeaks() {
       const p10 = validPeaks[Math.floor(validPeaks.length * 0.10)];
       const p90 = validPeaks[Math.floor(validPeaks.length * 0.90)];
 
-      // If clear dynamic range exists, set smart threshold slightly above the 10th percentile
+      // Keep smart threshold within realistic inter-track gap range (-42 dB to -32 dB)
       if (p90 - p10 >= 8) {
-        const smartThreshold = Math.min(-25, Math.max(-55, Math.round(p10 + 3.5)));
+        const smartThreshold = Math.min(-32, Math.max(-42, Math.round(p10 + 6)));
         state.settings.silenceDb = smartThreshold;
         if (elements.inputSilenceDb) {
           elements.inputSilenceDb.value = smartThreshold;
@@ -900,8 +1014,8 @@ async function computePeaks() {
     }
 
     state.peaks = peaks;
-    hideLoading();
-    drawWaveform();
+    updateLoadingProgress(100, 'Audio ready!');
+    finalizeProcessing();
   } catch (err) {
     console.warn('Loudness peak computation failed, using synthetic envelope:', err);
     finishPeaksFallback();
@@ -921,8 +1035,21 @@ function finishPeaksFallback() {
     fallbackPeaks[i] = -30 + Math.sin(i * 0.1) * 15;
   }
   state.peaks = fallbackPeaks;
+  finalizeProcessing();
+}
+
+function finalizeProcessing() {
   hideLoading();
+
+  elements.dropzone.classList.add('hidden');
+  elements.fileInfoSection.classList.remove('hidden');
+  elements.waveformCard.classList.remove('hidden');
+
+  enableActionButtons();
+  if (elements.fileInput) elements.fileInput.disabled = false;
+
   drawWaveform();
+  showSnackbar(`Ready to split "${state.file.name}"!`);
 }
 
 // =============================================================================
@@ -1093,6 +1220,8 @@ function openAutoDialog() {
 function analyzeSilence() {
   if (!state.peaks || !state.index) return;
 
+  stopPreview();
+
   if (elements.autoAnalyzingState) elements.autoAnalyzingState.classList.remove('hidden');
   if (elements.suggestionsList) elements.suggestionsList.innerHTML = '';
 
@@ -1132,41 +1261,55 @@ function analyzeSilence() {
         inSilence = false;
         const silenceLen = i - silenceStartIdx;
         if (silenceLen >= minSilenceWindows) {
-          silentRanges.push({
-            startIdx: silenceStartIdx,
-            endIdx: i,
-          });
+          // Verify that the candidate silence actually reaches a genuine quiet valley
+          // (at least 3 dB below threshold, or <= -38 dB).
+          // This prevents gentle guitar/vocal pauses inside a song from being mistaken for a track end!
+          let minLoudness = smoothed[silenceStartIdx];
+          for (let j = silenceStartIdx; j < i; j++) {
+            if (smoothed[j] < minLoudness) minLoudness = smoothed[j];
+          }
+          if (minLoudness <= thresholdDb - 3 || minLoudness <= -38) {
+            silentRanges.push({
+              startIdx: silenceStartIdx,
+              endIdx: i,
+            });
+          }
         }
       }
     }
   }
 
   if (inSilence && smoothed.length - silenceStartIdx >= minSilenceWindows) {
-    silentRanges.push({
-      startIdx: silenceStartIdx,
-      endIdx: smoothed.length,
-    });
+    let minLoudness = smoothed[silenceStartIdx];
+    for (let j = silenceStartIdx; j < smoothed.length; j++) {
+      if (smoothed[j] < minLoudness) minLoudness = smoothed[j];
+    }
+    if (minLoudness <= thresholdDb - 3 || minLoudness <= -38) {
+      silentRanges.push({
+        startIdx: silenceStartIdx,
+        endIdx: smoothed.length,
+      });
+    }
   }
 
-  // 3. Cut points: find the deepest valley (absolute quietest frame) within each silence gap
+  // 3. Cut points: calculate precise, safe cut positions inside each silence gap
+  // Placing the cut in the early-middle portion (30-35%) of the silence window ensures
+  // the previous song's reverb tail has completely decayed, and leaves ample clean silence
+  // before the next song's transient attack, so Part 1 NEVER encroaches into Song 2!
   const cutPoints = [];
   silentRanges.forEach((range) => {
-    let quietestIdx = range.startIdx;
-    let minLoudness = smoothed[range.startIdx];
+    const rangeSpan = (range.endIdx - range.startIdx) * windowSec;
+    // Always place cut point at early-middle (35%) of silence gap.
+    // This gives a clean decay tail for the previous track, and guarantees
+    // at least 65% of the silent air as lead-in before the next track's attack,
+    // so Part 1 NEVER encroaches into Song 2!
+    const cutSec = (range.startIdx * windowSec) + rangeSpan * 0.35;
 
-    for (let j = range.startIdx; j < range.endIdx; j++) {
-      if (smoothed[j] < minLoudness) {
-        minLoudness = smoothed[j];
-        quietestIdx = j;
-      }
-    }
-
-    const quietestSec = quietestIdx * windowSec;
     // Snap to exact MP3 audio frame boundary
-    const snappedTime = Math.round(quietestSec / frameDuration) * frameDuration;
+    const snappedTime = Math.round(cutSec / frameDuration) * frameDuration;
 
-    // Discard cuts that are too close to start/end of file
-    if (snappedTime >= 2.0 && snappedTime <= duration - 2.0) {
+    // Discard cuts that are too close to start/end of file (< 4s)
+    if (snappedTime >= 4.0 && snappedTime <= duration - 4.0) {
       cutPoints.push(snappedTime);
     }
   });
@@ -1182,13 +1325,22 @@ function analyzeSilence() {
   }
 
   // 5. Merge candidates shorter than minPartSec
+  // If the first candidate is short (e.g. file start silence), merge it forward into Track 1
   const filteredCandidates = [];
   for (let i = 0; i < rawCandidates.length; i++) {
     const cand = rawCandidates[i];
-    if (cand.end - cand.start < minPartSec && filteredCandidates.length > 0) {
-      filteredCandidates[filteredCandidates.length - 1].end = cand.end;
-    } else {
+    if (filteredCandidates.length === 0) {
+      if (cand.end - cand.start < minPartSec && rawCandidates.length > 1) {
+        rawCandidates[1].start = cand.start;
+        continue;
+      }
       filteredCandidates.push({ ...cand });
+    } else {
+      if (cand.end - cand.start < minPartSec) {
+        filteredCandidates[filteredCandidates.length - 1].end = cand.end;
+      } else {
+        filteredCandidates.push({ ...cand });
+      }
     }
   }
 
@@ -1229,6 +1381,11 @@ function renderSuggestions() {
   state.suggestions.forEach((sug) => {
     const row = document.createElement('div');
     row.className = 'suggestion-row';
+    row.dataset.sugId = sug.id;
+    const isPlaying = Boolean(state.ui.previewId && state.ui.previewId === sug.id);
+    if (isPlaying) {
+      row.classList.add('is-playing');
+    }
 
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
@@ -1255,16 +1412,17 @@ function renderSuggestions() {
 
     const previewBtn = document.createElement('button');
     previewBtn.type = 'button';
-    previewBtn.className = 'btn-icon';
-    previewBtn.title = 'Preview this candidate part';
-    previewBtn.innerHTML = `
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-        <polygon points="5 3 19 12 5 21 5 3"/>
-      </svg>
-    `;
+    previewBtn.className = 'btn-icon btn-preview-sug';
+    if (isPlaying) previewBtn.classList.add('is-playing');
+    previewBtn.title = isPlaying ? 'Stop preview' : 'Preview this candidate part';
+    previewBtn.setAttribute('aria-label', isPlaying ? `Stop preview ${sug.name}` : `Preview ${sug.name}`);
+    previewBtn.innerHTML = isPlaying
+      ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`
+      : `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+
     previewBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      playAudioRange(sug.start, sug.end);
+      togglePreviewSuggestion(sug);
     });
 
     row.appendChild(checkbox);
@@ -1274,6 +1432,33 @@ function renderSuggestions() {
   });
 
   updateAddSelectedButton();
+}
+
+function togglePreviewSuggestion(sug) {
+  if (state.ui.previewId === sug.id) {
+    stopPreview();
+  } else {
+    playAudioRange(sug.start, sug.end, sug.id);
+  }
+}
+
+function updateSuggestionPreviewButtons() {
+  if (!elements.suggestionsList) return;
+  const rows = elements.suggestionsList.querySelectorAll('.suggestion-row');
+  rows.forEach((row) => {
+    const sugId = row.dataset.sugId;
+    const isPlaying = Boolean(sugId && state.ui.previewId === sugId);
+    row.classList.toggle('is-playing', isPlaying);
+    const btn = row.querySelector('.btn-preview-sug');
+    if (btn) {
+      btn.classList.toggle('is-playing', isPlaying);
+      btn.title = isPlaying ? 'Stop preview' : 'Preview this candidate part';
+      btn.setAttribute('aria-label', isPlaying ? 'Stop preview' : 'Preview candidate part');
+      btn.innerHTML = isPlaying
+        ? `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`
+        : `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
+    }
+  });
 }
 
 function setAllSuggestionsSelected(selected) {
@@ -1466,9 +1651,13 @@ function renderParts() {
     const btnPreview = document.createElement('button');
     btnPreview.type = 'button';
     btnPreview.className = 'btn-icon';
-    btnPreview.title = 'Preview this part';
-    btnPreview.ariaLabel = `Preview ${part.name}`;
     const isThisPreviewing = state.ui.previewId === part.id;
+    if (isThisPreviewing) {
+      btnPreview.classList.add('is-playing');
+      li.classList.add('is-playing');
+    }
+    btnPreview.title = isThisPreviewing ? 'Stop preview' : 'Preview this part';
+    btnPreview.ariaLabel = isThisPreviewing ? `Stop preview ${part.name}` : `Preview ${part.name}`;
     btnPreview.innerHTML = isThisPreviewing
       ? `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>`
       : `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>`;
@@ -1598,9 +1787,10 @@ function playAudioRange(startSec, endSec, partId = null) {
 
   const frameDuration = state.index.frameDuration;
   const frameOffsets = state.index.frameOffsets;
+  const firstAudioFrameIndex = state.index.firstAudioFrameIndex || 0;
 
-  const startFrame = Math.max(0, Math.floor(startSec / frameDuration));
-  const endFrame = Math.min(frameOffsets.length, Math.ceil(endSec / frameDuration));
+  const startFrame = Math.max(firstAudioFrameIndex, firstAudioFrameIndex + Math.floor(startSec / frameDuration));
+  const endFrame = Math.min(frameOffsets.length, firstAudioFrameIndex + Math.ceil(endSec / frameDuration));
 
   const startByte = frameOffsets[startFrame] || 0;
   const endByte = endFrame < frameOffsets.length ? frameOffsets[endFrame] : state.file.buffer.byteLength;
@@ -1609,16 +1799,29 @@ function playAudioRange(startSec, endSec, partId = null) {
   const blob = new Blob([slice], { type: 'audio/mpeg' });
   const url = URL.createObjectURL(blob);
 
+  if (state.ui.previewBlobUrl) {
+    try {
+      URL.revokeObjectURL(state.ui.previewBlobUrl);
+    } catch (_) {}
+  }
+  state.ui.previewBlobUrl = url;
+
   elements.previewAudio.src = url;
   state.ui.previewId = partId;
+
+  // Sync UI immediately on click
+  renderParts();
+  updateSuggestionPreviewButtons();
 
   elements.previewAudio
     .play()
     .then(() => {
       renderParts();
+      updateSuggestionPreviewButtons();
     })
     .catch((err) => {
       console.warn('Playback error:', err);
+      stopPreview();
       showSnackbar('Playback not allowed or audio format error.');
     });
 }
@@ -1630,11 +1833,18 @@ function stopPreview() {
   if (elements.previewAudio) {
     elements.previewAudio.removeAttribute('src');
   }
+  if (state.ui.previewBlobUrl) {
+    try {
+      URL.revokeObjectURL(state.ui.previewBlobUrl);
+    } catch (_) {}
+    state.ui.previewBlobUrl = null;
+  }
   state.ui.previewId = null;
   state.ui.isWholePlaying = false;
   if (elements.playIcon) elements.playIcon.classList.remove('hidden');
   if (elements.pauseIcon) elements.pauseIcon.classList.add('hidden');
   renderParts();
+  updateSuggestionPreviewButtons();
 }
 
 // =============================================================================
@@ -1651,9 +1861,10 @@ async function splitPart(part) {
   try {
     const frameOffsets = state.index.frameOffsets;
     const frameDuration = state.index.frameDuration;
+    const firstAudioFrameIndex = state.index.firstAudioFrameIndex || 0;
 
-    const startFrame = Math.max(0, Math.floor(part.start / frameDuration));
-    const endFrame = Math.min(frameOffsets.length, Math.ceil(part.end / frameDuration));
+    const startFrame = Math.max(firstAudioFrameIndex, firstAudioFrameIndex + Math.floor(part.start / frameDuration));
+    const endFrame = Math.min(frameOffsets.length, firstAudioFrameIndex + Math.ceil(part.end / frameDuration));
 
     const startByte = frameOffsets[startFrame];
     const endByte = endFrame < frameOffsets.length ? frameOffsets[endFrame] : state.file.buffer.byteLength;
@@ -1806,43 +2017,95 @@ async function handleInstallClick() {
 // =============================================================================
 // Dialog & UI State Helpers
 // =============================================================================
+function openFileInfoDialog() {
+  if (!state.file || !state.index) return;
+
+  state.ui.dialog = 'fileInfo';
+
+  const index = state.index;
+  const file = state.file;
+
+  if (elements.infoModalFileName) {
+    elements.infoModalFileName.textContent = file.name;
+    elements.infoModalFileName.title = file.name;
+  }
+  if (elements.infoModalDuration) {
+    elements.infoModalDuration.textContent = `${formatTime(index.duration)} (${index.duration.toFixed(1)}s)`;
+  }
+  if (elements.infoModalSize) {
+    const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+    elements.infoModalSize.textContent = `${sizeMb} MB (${file.size.toLocaleString()} bytes)`;
+  }
+  if (elements.infoModalBitrate) {
+    elements.infoModalBitrate.textContent = `${index.bitrate} kbps ${index.isVbr ? '(Variable Bitrate / VBR)' : '(Constant Bitrate / CBR)'}`;
+  }
+  if (elements.infoModalSampleRate) {
+    elements.infoModalSampleRate.textContent = `${index.sampleRate.toLocaleString()} Hz (${(index.sampleRate / 1000).toFixed(1)} kHz)`;
+  }
+  if (elements.infoModalFrames) {
+    const frameCount = index.audioFrameCount || index.frameCount || 0;
+    elements.infoModalFrames.textContent = `${frameCount.toLocaleString()} audio frames`;
+  }
+  if (elements.infoModalFrameDuration) {
+    elements.infoModalFrameDuration.textContent = `${(index.frameDuration * 1000).toFixed(2)} ms / frame`;
+  }
+
+  if (elements.fileInfoDialog) {
+    elements.fileInfoDialog.classList.add('open');
+  }
+}
+
 function closeDialog() {
   if (elements.autoSplitDialog) elements.autoSplitDialog.classList.remove('open');
   if (elements.rangeDialog) elements.rangeDialog.classList.remove('open');
+  if (elements.fileInfoDialog) elements.fileInfoDialog.classList.remove('open');
   if (elements.iosInstallModal) elements.iosInstallModal.classList.remove('open');
   state.ui.dialog = null;
+  if (state.ui.previewId) {
+    stopPreview();
+  }
   drawWaveform();
 }
 
-function showLoading(message) {
+function showLoading(message, title = null) {
   state.ui.loading = true;
-  elements.loadingSection.classList.remove('hidden');
-  elements.loadingMessage.textContent = message;
-  elements.loadingPercent.textContent = '0%';
-  elements.loadingProgressBar.style.width = '0%';
+  if (elements.loadingSection) elements.loadingSection.classList.remove('hidden');
+  if (elements.loadingTitle && title) {
+    elements.loadingTitle.textContent = title;
+  }
+  if (elements.loadingMessage) elements.loadingMessage.textContent = message;
+  if (elements.loadingPercent) elements.loadingPercent.textContent = '0%';
+  if (elements.loadingProgressBar) elements.loadingProgressBar.style.width = '0%';
 }
 
 function updateLoadingProgress(percent, message) {
-  elements.loadingPercent.textContent = `${percent}%`;
-  elements.loadingProgressBar.style.width = `${percent}%`;
-  if (message) {
+  const safePercent = Math.min(100, Math.max(0, Math.round(percent)));
+  if (elements.loadingPercent) elements.loadingPercent.textContent = `${safePercent}%`;
+  if (elements.loadingProgressBar) elements.loadingProgressBar.style.width = `${safePercent}%`;
+  if (message && elements.loadingMessage) {
     elements.loadingMessage.textContent = message;
   }
 }
 
 function hideLoading() {
   state.ui.loading = false;
-  elements.loadingSection.classList.add('hidden');
+  if (elements.loadingSection) elements.loadingSection.classList.add('hidden');
 }
 
 function enableActionButtons() {
   if (elements.btnOpenAuto) elements.btnOpenAuto.disabled = false;
   if (elements.btnOpenRange) elements.btnOpenRange.disabled = false;
+  if (elements.btnOpenFileInfo) elements.btnOpenFileInfo.disabled = false;
+  if (elements.btnPlayWholeFile) elements.btnPlayWholeFile.disabled = false;
+  if (elements.btnChangeFile) elements.btnChangeFile.style.pointerEvents = 'auto';
 }
 
 function disableActionButtons() {
   if (elements.btnOpenAuto) elements.btnOpenAuto.disabled = true;
   if (elements.btnOpenRange) elements.btnOpenRange.disabled = true;
+  if (elements.btnOpenFileInfo) elements.btnOpenFileInfo.disabled = true;
+  if (elements.btnPlayWholeFile) elements.btnPlayWholeFile.disabled = true;
+  if (elements.btnChangeFile) elements.btnChangeFile.style.pointerEvents = 'none';
 }
 
 let snackbarTimer = null;

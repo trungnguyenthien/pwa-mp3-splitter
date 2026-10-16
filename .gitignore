@@ -27,3 +27,8 @@ yarn-error.log*
 *.log
 scratch/
 tmp/
+
+# Audio media files
+*.mp3
+*.wav
+*.m4a
