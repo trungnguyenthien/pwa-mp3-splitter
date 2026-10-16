@@ -187,6 +187,13 @@ function initElements() {
     btnCloseIosModal: document.getElementById('btnCloseIosModal'),
     btnGotItIos: document.getElementById('btnGotItIos'),
 
+    // Format Error Modal
+    formatErrorModal: document.getElementById('formatErrorModal'),
+    formatModalMessage: document.getElementById('formatModalMessage'),
+    btnCloseFormatModal: document.getElementById('btnCloseFormatModal'),
+    btnDismissFormatModal: document.getElementById('btnDismissFormatModal'),
+    btnChooseMp3Instead: document.getElementById('btnChooseMp3Instead'),
+
     // Audio & Toast
     previewAudio: document.getElementById('previewAudio'),
     snackbar: document.getElementById('snackbar'),
@@ -201,7 +208,7 @@ function initElements() {
 function initWorker() {
   try {
     if (window.Worker && window.location.protocol !== 'file:') {
-      mp3Worker = new Worker('./mp3-worker.js?v=26');
+      mp3Worker = new Worker('./mp3-worker.js?v=27');
       mp3Worker.onmessage = handleWorkerMessage;
       mp3Worker.onerror = (err) => {
         console.warn('Worker error, switching to in-thread processing:', err);
@@ -240,7 +247,21 @@ function handleWorkerMessage(event) {
       elements.dropzone.classList.remove('hidden');
     }
     if (elements.fileInput) elements.fileInput.disabled = false;
-    showSnackbar('Error: ' + error);
+    
+    if (
+      error &&
+      (error.includes('M4A') ||
+        error.includes('WAV') ||
+        error.includes('FLAC') ||
+        error.includes('OGG') ||
+        error.includes('incompatible') ||
+        error.includes('density') ||
+        error.includes('not a valid MP3'))
+    ) {
+      showFormatErrorModal(state.file ? state.file.name : 'Selected file', 'Incompatible Format', error);
+    } else {
+      showSnackbar('Error: ' + error);
+    }
   }
 }
 
@@ -366,6 +387,23 @@ function initEvents() {
   }
   if (elements.btnGotItIos) {
     elements.btnGotItIos.addEventListener('click', () => closeDialog());
+  }
+
+  // Format Error Modal triggers
+  if (elements.btnCloseFormatModal) {
+    elements.btnCloseFormatModal.addEventListener('click', () => closeDialog());
+  }
+  if (elements.btnDismissFormatModal) {
+    elements.btnDismissFormatModal.addEventListener('click', () => closeDialog());
+  }
+  if (elements.btnChooseMp3Instead) {
+    elements.btnChooseMp3Instead.addEventListener('click', () => {
+      closeDialog();
+      if (elements.fileInput) {
+        elements.fileInput.value = '';
+        elements.fileInput.click();
+      }
+    });
   }
 
   // Waveform canvas interactions
@@ -667,7 +705,7 @@ function initEvents() {
     }
   });
 
-  [elements.autoSplitDialog, elements.rangeDialog, elements.fileInfoDialog, elements.iosInstallModal].forEach((backdrop) => {
+  [elements.autoSplitDialog, elements.rangeDialog, elements.fileInfoDialog, elements.iosInstallModal, elements.formatErrorModal].forEach((backdrop) => {
     if (backdrop) {
       backdrop.addEventListener('click', (e) => {
         if (e.target === backdrop) {
@@ -688,14 +726,29 @@ function handleFileSelected(event) {
 }
 
 async function processSelectedFile(file) {
-  const isMp3 =
-    file.name.toLowerCase().endsWith('.mp3') ||
-    file.type === 'audio/mpeg' ||
-    file.type === 'audio/mp3' ||
-    file.type.includes('audio');
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  const isMp3Ext = ext === 'mp3';
 
-  if (!isMp3) {
-    showSnackbar('Selected file is not recognized as an MP3 audio file.');
+  if (!isMp3Ext && file.name.includes('.')) {
+    const formatNames = {
+      m4a: 'M4A / AAC (Apple Audio)',
+      aac: 'AAC Audio Stream',
+      wav: 'WAV (Waveform Audio)',
+      flac: 'FLAC (Lossless Audio)',
+      ogg: 'OGG (Vorbis/Opus)',
+      wma: 'WMA Audio',
+      mp4: 'MP4 Media Container',
+      webm: 'WebM Audio',
+      m4r: 'M4R iPhone Ringtone',
+      aiff: 'AIFF Audio',
+    };
+    const detectedFormat = formatNames[ext] || `.${ext.toUpperCase()} Audio`;
+    showFormatErrorModal(
+      file.name,
+      detectedFormat,
+      `You selected a file ending with <strong>.${ext}</strong>. MP3 Splitter is a lossless frame cutter strictly designed for <strong>.mp3</strong> files. Slicing non-MP3 files results in false duration calculations (e.g. only a few seconds) and broken audio files. Please convert this file to .mp3 and try again.`
+    );
+    if (elements.fileInput) elements.fileInput.value = '';
     return;
   }
 
@@ -734,8 +787,25 @@ async function processSelectedFile(file) {
 
   try {
     const arrayBuffer = await file.arrayBuffer();
-    state.file.buffer = arrayBuffer;
 
+    // Check magic bytes before passing to worker/indexing
+    const formatCheck = detectAudioFileType(arrayBuffer, file.name);
+    if (!formatCheck.isMp3) {
+      hideLoading();
+      elements.dropzone.classList.remove('hidden');
+      if (elements.fileInput) {
+        elements.fileInput.disabled = false;
+        elements.fileInput.value = '';
+      }
+      showFormatErrorModal(
+        file.name,
+        formatCheck.format,
+        `File header contains <strong>${escapeHtml(formatCheck.format)}</strong> signatures rather than standard MPEG-1/2 Layer III MP3 frames. Please choose an authentic .mp3 file.`
+      );
+      return;
+    }
+
+    state.file.buffer = arrayBuffer;
     updateLoadingProgress(15, 'Indexing audio frames (lossless)...');
 
     if (mp3Worker) {
@@ -810,13 +880,97 @@ function onIndexComplete(index) {
 }
 
 // =============================================================================
+// Audio File Signature & Container Detection
+// =============================================================================
+function detectAudioFileType(buffer, fileName = '') {
+  if (buffer && buffer.byteLength >= 8) {
+    const bytes = new Uint8Array(buffer, 0, Math.min(128, buffer.byteLength));
+
+    // M4A / MP4: "ftyp" box (Apple MPEG-4 AAC/ALAC)
+    if (
+      (bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) ||
+      (bytes[0] === 0x66 && bytes[1] === 0x74 && bytes[2] === 0x79 && bytes[3] === 0x70)
+    ) {
+      return { isMp3: false, format: 'M4A / AAC (Apple MPEG-4 Audio)' };
+    }
+
+    // WAV: "RIFF" ... "WAVE"
+    if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) {
+      return { isMp3: false, format: 'WAV (Waveform Audio)' };
+    }
+
+    // FLAC: "fLaC"
+    if (bytes[0] === 0x66 && bytes[1] === 0x4c && bytes[2] === 0x61 && bytes[3] === 0x43) {
+      return { isMp3: false, format: 'FLAC (Lossless Audio)' };
+    }
+
+    // OGG: "OggS"
+    if (bytes[0] === 0x4f && bytes[1] === 0x67 && bytes[2] === 0x67 && bytes[3] === 0x53) {
+      return { isMp3: false, format: 'OGG (Vorbis/Opus Audio)' };
+    }
+
+    // WebM / Matroska
+    if (bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3) {
+      return { isMp3: false, format: 'WebM / Opus Audio' };
+    }
+  }
+
+  const ext = (fileName.split('.').pop() || '').toLowerCase();
+  if (ext && ext !== 'mp3') {
+    const knownFormats = {
+      m4a: 'M4A / AAC (Apple Audio)',
+      aac: 'AAC Audio Stream',
+      wav: 'WAV Audio',
+      flac: 'FLAC Lossless Audio',
+      ogg: 'OGG Vorbis/Opus Audio',
+      wma: 'WMA Audio',
+      mp4: 'MP4 Video/Audio',
+      webm: 'WebM Audio',
+      m4r: 'M4R iPhone Ringtone',
+      aiff: 'AIFF Audio',
+    };
+    return { isMp3: false, format: knownFormats[ext] || `.${ext.toUpperCase()} Audio` };
+  }
+
+  return { isMp3: true, format: 'MP3' };
+}
+
+// =============================================================================
 // In-Thread MP3 Indexing & Slicing Engine (Guarantees 100% Offline & File:// Support)
 // =============================================================================
 function parseMp3IndexDirect(buffer, onProgress) {
   const bytes = new Uint8Array(buffer);
   const totalLength = bytes.length;
 
+  // Fast signature check for non-MP3 audio containers
+  if (totalLength >= 8) {
+    if (
+      (bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) ||
+      (bytes[0] === 0x66 && bytes[1] === 0x74 && bytes[2] === 0x79 && bytes[3] === 0x70)
+    ) {
+      throw new Error(
+        'Selected file is in M4A/AAC format (MPEG-4 container), not MP3. MP3 Splitter is a lossless cutter exclusively designed for .mp3 audio frames.'
+      );
+    }
+    if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) {
+      throw new Error(
+        'Selected file is in WAV format, not MP3. MP3 Splitter is a lossless cutter exclusively designed for .mp3 audio frames.'
+      );
+    }
+    if (bytes[0] === 0x66 && bytes[1] === 0x4c && bytes[2] === 0x61 && bytes[3] === 0x43) {
+      throw new Error(
+        'Selected file is in FLAC format, not MP3. MP3 Splitter is a lossless cutter exclusively designed for .mp3 audio frames.'
+      );
+    }
+    if (bytes[0] === 0x4f && bytes[1] === 0x67 && bytes[2] === 0x67 && bytes[3] === 0x53) {
+      throw new Error(
+        'Selected file is in OGG format, not MP3. MP3 Splitter is a lossless cutter exclusively designed for .mp3 audio frames.'
+      );
+    }
+  }
+
   let offset = 0;
+  let id3Size = 0;
   if (
     totalLength >= 10 &&
     bytes[0] === 0x49 &&
@@ -830,12 +984,14 @@ function parseMp3IndexDirect(buffer, onProgress) {
       ((bytes[8] & 0x7f) << 7) |
       (bytes[9] & 0x7f);
     const hasFooter = (flags & 0x10) !== 0;
+    id3Size = 10 + synchsafeSize + (hasFooter ? 10 : 0);
     offset = Math.min(10 + synchsafeSize + (hasFooter ? 10 : 0), totalLength);
   }
 
   let capacity = 32768;
   let frameOffsets = new Uint32Array(capacity);
   let frameCount = 0;
+  let totalFrameBytes = 0;
 
   let firstValidFrameHeader = null;
   let firstAudioFrameIndex = 0;
@@ -920,6 +1076,7 @@ function parseMp3IndexDirect(buffer, onProgress) {
 
           frameOffsets[frameCount] = offset;
           frameCount++;
+          totalFrameBytes += frameLength;
 
           detectedBitrates.add(bitrateKbps);
           detectedBitrateSum += bitrateKbps;
@@ -939,6 +1096,15 @@ function parseMp3IndexDirect(buffer, onProgress) {
 
   if (frameCount === 0 || !firstValidFrameHeader) {
     throw new Error('No valid MP3 audio frames found in file.');
+  }
+
+  const audioDataBytes = Math.max(1, totalLength - id3Size);
+  const coverageRatio = totalFrameBytes / audioDataBytes;
+
+  if (frameCount < 5 || coverageRatio < 0.45) {
+    throw new Error(
+      `File appears to be an incompatible audio format or corrupted MP3. Only ${frameCount} isolated frames found (${(coverageRatio * 100).toFixed(1)}% MP3 frame density). Please use a valid .mp3 file.`
+    );
   }
 
   const trimmedOffsets = frameOffsets.subarray(0, frameCount);
@@ -2512,11 +2678,43 @@ function openFileInfoDialog() {
   }
 }
 
+function showFormatErrorModal(fileName, formatName, details = null) {
+  if (!elements.formatErrorModal) return;
+
+  const safeFileName = fileName || 'Selected File';
+  const displayFormat = formatName || 'Incompatible audio format';
+
+  let msgHtml = `
+    <div style="margin-bottom: 12px;">
+      <div style="font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px;">Detected format</div>
+      <div style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 6px; background: rgba(239, 68, 68, 0.18); border: 1px solid rgba(239, 68, 68, 0.35); color: #fca5a5; font-weight: 600; font-size: 0.875rem;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        <span>${escapeHtml(displayFormat)}</span>
+      </div>
+    </div>
+    <div style="font-size: 0.875rem; color: var(--md-sys-color-on-surface); line-height: 1.5; margin-bottom: 12px;">
+      File <strong style="color: #ffffff; word-break: break-all;">"${escapeHtml(safeFileName)}"</strong> is not an MP3 audio file.
+    </div>
+    <div style="font-size: 0.8125rem; color: var(--md-sys-color-on-surface-variant); line-height: 1.5;">
+      ${details ? escapeHtml(details) : 'MP3 Splitter only processes standard MP3 (.mp3) files. Please convert this audio file to .mp3 and load it again.'}
+    </div>
+  `;
+
+  if (elements.formatModalMessage) {
+    elements.formatModalMessage.innerHTML = msgHtml;
+  }
+
+  closeDialog();
+  elements.formatErrorModal.classList.add('open');
+  state.ui.dialog = 'formatError';
+}
+
 function closeDialog() {
   if (elements.autoSplitDialog) elements.autoSplitDialog.classList.remove('open');
   if (elements.rangeDialog) elements.rangeDialog.classList.remove('open');
   if (elements.fileInfoDialog) elements.fileInfoDialog.classList.remove('open');
   if (elements.iosInstallModal) elements.iosInstallModal.classList.remove('open');
+  if (elements.formatErrorModal) elements.formatErrorModal.classList.remove('open');
   closeTimeWheel();
   state.ui.dialog = null;
   if (state.ui.previewId) {

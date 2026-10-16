@@ -37,6 +37,37 @@ function indexMp3(buffer) {
   const bytes = new Uint8Array(buffer);
   const totalLength = bytes.length;
 
+  // Fast signature check for non-MP3 audio containers
+  if (totalLength >= 8) {
+    // M4A / MP4 ("ftyp" box at offset 4..7 or 0..3)
+    if (
+      (bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) ||
+      (bytes[0] === 0x66 && bytes[1] === 0x74 && bytes[2] === 0x79 && bytes[3] === 0x70)
+    ) {
+      throw new Error(
+        'Selected file is in M4A/AAC format (MPEG-4 container), not MP3. MP3 Splitter is a lossless cutter exclusively designed for .mp3 audio frames.'
+      );
+    }
+    // WAV ("RIFF" ... "WAVE")
+    if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) {
+      throw new Error(
+        'Selected file is in WAV format, not MP3. MP3 Splitter is a lossless cutter exclusively designed for .mp3 audio frames.'
+      );
+    }
+    // FLAC ("fLaC")
+    if (bytes[0] === 0x66 && bytes[1] === 0x4c && bytes[2] === 0x61 && bytes[3] === 0x43) {
+      throw new Error(
+        'Selected file is in FLAC format, not MP3. MP3 Splitter is a lossless cutter exclusively designed for .mp3 audio frames.'
+      );
+    }
+    // OGG ("OggS")
+    if (bytes[0] === 0x4f && bytes[1] === 0x67 && bytes[2] === 0x67 && bytes[3] === 0x53) {
+      throw new Error(
+        'Selected file is in OGG format, not MP3. MP3 Splitter is a lossless cutter exclusively designed for .mp3 audio frames.'
+      );
+    }
+  }
+
   let offset = 0;
   let id3Size = 0;
 
@@ -62,6 +93,7 @@ function indexMp3(buffer) {
   let capacity = 32768;
   let frameOffsets = new Uint32Array(capacity);
   let frameCount = 0;
+  let totalFrameBytes = 0;
 
   let firstValidFrameHeader = null;
   let firstAudioFrameIndex = 0;
@@ -168,6 +200,7 @@ function indexMp3(buffer) {
 
           frameOffsets[frameCount] = offset;
           frameCount++;
+          totalFrameBytes += frameLength;
 
           detectedBitrates.add(bitrateKbps);
           detectedBitrateSum += bitrateKbps;
@@ -192,6 +225,18 @@ function indexMp3(buffer) {
 
   if (frameCount === 0 || !firstValidFrameHeader) {
     throw new Error('No valid MP3 audio frames found in file.');
+  }
+
+  // Calculate audio frame coverage density
+  const audioDataBytes = Math.max(1, totalLength - id3Size);
+  const coverageRatio = totalFrameBytes / audioDataBytes;
+
+  // In real MP3 files, valid frames account for > 85% of data.
+  // In non-MP3 files (e.g. AAC/M4A or arbitrary binary), accidental syncs cover < 5%.
+  if (frameCount < 5 || coverageRatio < 0.45) {
+    throw new Error(
+      `File appears to be an incompatible audio format or corrupted MP3. Only ${frameCount} isolated frames found (${(coverageRatio * 100).toFixed(1)}% MP3 frame density). Please use a valid .mp3 file.`
+    );
   }
 
   // Trim to actual frame count
