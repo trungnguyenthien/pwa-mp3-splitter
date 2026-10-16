@@ -22,7 +22,7 @@
   <link rel="icon" type="image/png" href="./icons/favicon.png">
 
   <!-- Versioned Stylesheet adhering to pwa-standards.md -->
-  <link rel="stylesheet" href="./styles.css?v=11">
+  <link rel="stylesheet" href="./styles.css?v=13">
 </head>
 <body>
 
@@ -293,18 +293,18 @@
             <div style="margin-bottom: 4px;">
               <div style="font-size: 0.8125rem; font-weight: 500; margin-bottom: 6px; color: var(--md-sys-color-on-surface-variant);">Detection Presets</div>
               <div class="preset-chips">
-                <button type="button" id="btnPresetMusic" class="preset-chip active">Music Album / Mix (0.25s, -35dB)</button>
-                <button type="button" id="btnPresetSpeech" class="preset-chip">Speech / Podcast (0.8s, -42dB)</button>
-                <button type="button" id="btnPresetLong" class="preset-chip">Deep Pause (1.5s, -48dB)</button>
+                <button type="button" id="btnPresetMusic" class="preset-chip active">Music Album / Mix (0.25s, -32dB, 95s)</button>
+                <button type="button" id="btnPresetSpeech" class="preset-chip">Speech / Podcast (0.8s, -42dB, 30s)</button>
+                <button type="button" id="btnPresetLong" class="preset-chip">Deep Pause (1.5s, -48dB, 60s)</button>
               </div>
             </div>
 
             <div class="slider-group">
               <div class="slider-header">
                 <label for="inputSilenceDb">Silence Threshold (dB)</label>
-                <span id="valSilenceDb" class="tabular-nums">-35 dB</span>
+                <span id="valSilenceDb" class="tabular-nums">-32 dB</span>
               </div>
-              <input type="range" id="inputSilenceDb" min="-60" max="-20" step="1" value="-35">
+              <input type="range" id="inputSilenceDb" min="-60" max="-20" step="1" value="-32">
             </div>
 
             <div class="slider-group">
@@ -318,9 +318,9 @@
             <div class="slider-group">
               <div class="slider-header">
                 <label for="inputMinPart">Min Part Duration (s)</label>
-                <span id="valMinPart" class="tabular-nums">45s</span>
+                <span id="valMinPart" class="tabular-nums">95s</span>
               </div>
-              <input type="range" id="inputMinPart" min="10" max="300" step="5" value="45">
+              <input type="range" id="inputMinPart" min="10" max="300" step="5" value="95">
             </div>
 
             <button type="button" id="btnReanalyze" class="btn btn-tonal btn-sm" style="align-self: flex-start; margin-top: 6px;">
@@ -483,6 +483,6 @@
   </div>
 
   <!-- Application Logic with Cache-Busting adhering to pwa-standards.md -->
-  <script defer src="./app.js?v=11"></script>
+  <script defer src="./app.js?v=13"></script>
 </body>
 </html>

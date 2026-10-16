@@ -26,9 +26,9 @@ const state = {
   parts: [], // [{ id, name, start, end, status: 'idle'|'working'|'done'|'error', blobUrl, lastBlob }]
   suggestions: [], // [{ id, name, start, end, duration, selected }]
   settings: {
-    silenceDb: -35,
+    silenceDb: -32,
     minSilenceSec: 0.25,
-    minPartSec: 45,
+    minPartSec: 95,
   },
   ui: {
     loading: false,
@@ -390,7 +390,7 @@ function initEvents() {
 
   if (elements.btnPresetMusic) {
     elements.btnPresetMusic.addEventListener('click', () => {
-      applyDetectionPreset(-35, 0.25, 45, elements.btnPresetMusic);
+      applyDetectionPreset(-32, 0.25, 95, elements.btnPresetMusic);
     });
   }
   if (elements.btnPresetSpeech) {
@@ -1234,7 +1234,7 @@ function analyzeSilence() {
   const minSilenceSec = state.settings.minSilenceSec;
   const minPartSec = state.settings.minPartSec;
 
-  const minSilenceWindows = Math.ceil(minSilenceSec / windowSec);
+  const minSilenceWindows = Math.max(3, Math.round(minSilenceSec / windowSec));
 
   // 1. Moving Average Smoothing (3-window, ~150ms) to filter out transient pops/spikes
   const smoothed = new Float32Array(peaks.length);
@@ -1261,17 +1261,21 @@ function analyzeSilence() {
         inSilence = false;
         const silenceLen = i - silenceStartIdx;
         if (silenceLen >= minSilenceWindows) {
-          // Verify that the candidate silence actually reaches a genuine quiet valley
-          // (at least 3 dB below threshold, or <= -38 dB).
-          // This prevents gentle guitar/vocal pauses inside a song from being mistaken for a track end!
+          // Verify that candidate silence drops into a genuine valley
+          // (at least 1.5 dB below threshold, or <= -34 dB).
           let minLoudness = smoothed[silenceStartIdx];
+          let minRaw = peaks[silenceStartIdx];
           for (let j = silenceStartIdx; j < i; j++) {
             if (smoothed[j] < minLoudness) minLoudness = smoothed[j];
+            if (peaks[j] < minRaw) minRaw = peaks[j];
           }
-          if (minLoudness <= thresholdDb - 3 || minLoudness <= -38) {
+          if (minLoudness <= thresholdDb - 1.5 || minLoudness <= -34.0) {
             silentRanges.push({
               startIdx: silenceStartIdx,
               endIdx: i,
+              minLoudness: minLoudness,
+              minRaw: minRaw,
+              span: (i - silenceStartIdx) * windowSec,
             });
           }
         }
@@ -1281,28 +1285,29 @@ function analyzeSilence() {
 
   if (inSilence && smoothed.length - silenceStartIdx >= minSilenceWindows) {
     let minLoudness = smoothed[silenceStartIdx];
+    let minRaw = peaks[silenceStartIdx];
     for (let j = silenceStartIdx; j < smoothed.length; j++) {
       if (smoothed[j] < minLoudness) minLoudness = smoothed[j];
+      if (peaks[j] < minRaw) minRaw = peaks[j];
     }
-    if (minLoudness <= thresholdDb - 3 || minLoudness <= -38) {
+    if (minLoudness <= thresholdDb - 1.5 || minLoudness <= -34.0) {
       silentRanges.push({
         startIdx: silenceStartIdx,
         endIdx: smoothed.length,
+        minLoudness: minLoudness,
+        minRaw: minRaw,
+        span: (smoothed.length - silenceStartIdx) * windowSec,
       });
     }
   }
 
   // 3. Cut points: calculate precise, safe cut positions inside each silence gap
-  // Placing the cut in the early-middle portion (30-35%) of the silence window ensures
+  // Placing the cut in the early-middle portion (35%) of the silence window ensures
   // the previous song's reverb tail has completely decayed, and leaves ample clean silence
   // before the next song's transient attack, so Part 1 NEVER encroaches into Song 2!
-  const cutPoints = [];
+  const candidateCuts = [];
   silentRanges.forEach((range) => {
-    const rangeSpan = (range.endIdx - range.startIdx) * windowSec;
-    // Always place cut point at early-middle (35%) of silence gap.
-    // This gives a clean decay tail for the previous track, and guarantees
-    // at least 65% of the silent air as lead-in before the next track's attack,
-    // so Part 1 NEVER encroaches into Song 2!
+    const rangeSpan = range.span;
     const cutSec = (range.startIdx * windowSec) + rangeSpan * 0.35;
 
     // Snap to exact MP3 audio frame boundary
@@ -1310,28 +1315,59 @@ function analyzeSilence() {
 
     // Discard cuts that are too close to start/end of file (< 4s)
     if (snappedTime >= 4.0 && snappedTime <= duration - 4.0) {
-      cutPoints.push(snappedTime);
+      candidateCuts.push({
+        time: snappedTime,
+        minLoudness: range.minLoudness,
+        minRaw: range.minRaw,
+        span: rangeSpan,
+      });
     }
   });
 
-  // 4. Candidate parts between cut points
-  const candidateBoundaries = [0, ...cutPoints, duration];
-  let rawCandidates = [];
-
-  for (let i = 0; i < candidateBoundaries.length - 1; i++) {
-    const start = candidateBoundaries[i];
-    const end = candidateBoundaries[i + 1];
-    rawCandidates.push({ start, end });
+  // 4. Cluster cuts closer than minPartSec, picking the deepest silence valley in each cluster
+  const clusters = [];
+  for (const cut of candidateCuts) {
+    if (clusters.length === 0) {
+      clusters.push([cut]);
+    } else {
+      const lastCluster = clusters[clusters.length - 1];
+      if (cut.time - lastCluster[lastCluster.length - 1].time < minPartSec) {
+        lastCluster.push(cut);
+      } else {
+        clusters.push([cut]);
+      }
+    }
   }
 
-  // 5. Merge candidates shorter than minPartSec
-  // If the first candidate is short (e.g. file start silence), merge it forward into Track 1
+  const finalCuts = [];
+  for (const cluster of clusters) {
+    let best = cluster[0];
+    for (let c = 1; c < cluster.length; c++) {
+      if (
+        cluster[c].minRaw < best.minRaw - 1.0 ||
+        (Math.abs(cluster[c].minRaw - best.minRaw) <= 1.0 && cluster[c].minLoudness < best.minLoudness - 0.5) ||
+        (Math.abs(cluster[c].minRaw - best.minRaw) <= 1.0 && Math.abs(cluster[c].minLoudness - best.minLoudness) <= 0.5 && cluster[c].span > best.span)
+      ) {
+        best = cluster[c];
+      }
+    }
+    finalCuts.push(best.time);
+  }
+
+  // 5. Candidate parts between cut points
+  const candidateBoundaries = [0, ...finalCuts, duration];
+  const candidateParts = [];
+  for (let i = 0; i < candidateBoundaries.length - 1; i++) {
+    candidateParts.push({ start: candidateBoundaries[i], end: candidateBoundaries[i + 1] });
+  }
+
+  // 6. Merge edge candidates shorter than minPartSec if needed
   const filteredCandidates = [];
-  for (let i = 0; i < rawCandidates.length; i++) {
-    const cand = rawCandidates[i];
+  for (let i = 0; i < candidateParts.length; i++) {
+    const cand = candidateParts[i];
     if (filteredCandidates.length === 0) {
-      if (cand.end - cand.start < minPartSec && rawCandidates.length > 1) {
-        rawCandidates[1].start = cand.start;
+      if (cand.end - cand.start < minPartSec && candidateParts.length > 1) {
+        candidateParts[1].start = cand.start;
         continue;
       }
       filteredCandidates.push({ ...cand });
