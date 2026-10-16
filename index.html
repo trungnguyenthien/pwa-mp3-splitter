@@ -22,7 +22,7 @@
   <link rel="icon" type="image/png" href="./icons/favicon.png">
 
   <!-- Versioned Stylesheet adhering to pwa-standards.md -->
-  <link rel="stylesheet" href="./styles.css?v=16">
+  <link rel="stylesheet" href="./styles.css?v=21">
 </head>
 <body>
 
@@ -67,13 +67,6 @@
       <label for="fileInput" id="dropzone" class="dropzone" tabindex="0" aria-label="Click or drop MP3 file here">
         <input type="file" id="fileInput" accept="audio/mpeg,.mp3,audio/*" class="visually-hidden">
         <h2 class="visually-hidden">Choose or Drop an MP3 File</h2>
-        <div class="dropzone-icon" aria-hidden="true">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 18V5l12-2v13"/>
-            <circle cx="6" cy="18" r="3"/>
-            <circle cx="18" cy="16" r="3"/>
-          </svg>
-        </div>
         <div class="dropzone-action">
           <span class="btn btn-primary" id="btnChooseFile">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -343,10 +336,10 @@
 
   <!-- Time Range Dialog (Modal / Bottom Sheet on mobile) -->
   <div id="rangeDialog" class="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="rangeDialogTitle">
-    <div class="dialog-panel">
+    <div class="dialog-panel range-dialog-panel">
       <div class="dialog-header">
-        <h2 id="rangeDialogTitle" class="dialog-title">Add Time Range Part</h2>
-        <button id="btnCloseRangeDialog" class="btn-icon" aria-label="Close dialog">
+        <h2 id="rangeDialogTitle" class="dialog-title">Thêm đoạn thời gian</h2>
+        <button id="btnCloseRangeDialog" class="btn-icon" aria-label="Đóng hộp thoại">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"/>
             <line x1="6" y1="6" x2="18" y2="18"/>
@@ -354,23 +347,77 @@
         </button>
       </div>
 
-      <div class="dialog-body">
-        <div class="form-group">
-          <label for="inputRangeStart" class="form-label">Start Time (seconds)</label>
-          <input type="number" id="inputRangeStart" class="input-text tabular-nums" placeholder="0" min="0" step="any">
-          <div id="rangeStartHelper" class="form-helper tabular-nums">Preview: 00:00.0</div>
+      <div class="dialog-body range-dialog-body">
+        <!-- Dual Touch Cards for Start & End Time -->
+        <div class="time-cards-grid">
+          <div class="time-card active" id="cardRangeStart" role="button" tabindex="0" aria-label="Chọn thời gian bắt đầu">
+            <div class="time-card-header">
+              <span class="time-card-dot"></span>
+              <span class="time-card-title">BẮT ĐẦU</span>
+              <span class="time-card-badge">Start</span>
+            </div>
+            <div class="time-card-input-wrapper">
+              <input type="text" id="inputRangeStart" class="time-card-input tabular-nums" placeholder="00:00" inputmode="numeric" autocomplete="off" spellcheck="false" value="00:00">
+            </div>
+            <div id="rangeStartHelper" class="time-card-sub tabular-nums">00:00.0 (0s)</div>
+          </div>
+
+          <div class="time-card" id="cardRangeEnd" role="button" tabindex="0" aria-label="Chọn thời gian kết thúc">
+            <div class="time-card-header">
+              <span class="time-card-dot"></span>
+              <span class="time-card-title">KẾT THÚC</span>
+              <span class="time-card-badge">End</span>
+            </div>
+            <div class="time-card-input-wrapper">
+              <input type="text" id="inputRangeEnd" class="time-card-input tabular-nums" placeholder="01:00" inputmode="numeric" autocomplete="off" spellcheck="false" value="01:00">
+            </div>
+            <div id="rangeEndHelper" class="time-card-sub tabular-nums">01:00.0 (60s)</div>
+          </div>
         </div>
 
-        <div class="form-group">
-          <label for="inputRangeEnd" class="form-label">End Time (seconds)</label>
-          <input type="number" id="inputRangeEnd" class="input-text tabular-nums" placeholder="60" min="0" step="any">
-          <div id="rangeEndHelper" class="form-helper tabular-nums">Preview: 00:00.0</div>
+        <!-- Part Duration Pill Indicator -->
+        <div class="time-duration-pill" id="rangeDurationPill">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <span class="duration-label">Thời lượng đoạn:</span>
+          <span id="rangeDurationText" class="duration-val tabular-nums">01:00 (60s)</span>
+        </div>
+
+        <!-- Interactive Jog Wheel Spinner Section (Always Visible on Mobile) -->
+        <div id="timeWheelContainer" class="time-wheel-container">
+          <div class="time-wheel-header">
+            <div class="time-wheel-target-info">
+              <span class="wheel-target-dot"></span>
+              <span class="wheel-target-label">Chỉnh:</span>
+              <span id="wheelTargetText" class="wheel-target-name">Bắt đầu (00:00)</span>
+            </div>
+
+            <div class="time-wheel-actions">
+              <button type="button" id="btnWheelStepMinus10" class="btn-wheel-step tabular-nums" title="Lùi 10s">-10s</button>
+              <button type="button" id="btnWheelStepMinus1" class="btn-wheel-step tabular-nums" title="Lùi 1s">-1s</button>
+              <button type="button" id="btnWheelStepPlus1" class="btn-wheel-step tabular-nums" title="Tăng 1s">+1s</button>
+              <button type="button" id="btnWheelStepPlus10" class="btn-wheel-step tabular-nums" title="Tăng 10s">+10s</button>
+            </div>
+          </div>
+
+          <div class="time-wheel-viewport" id="timeWheelViewport" tabindex="0" role="slider" aria-label="Time Wheel Picker">
+            <div class="time-wheel-lens">
+              <span class="wheel-lens-arrow">▶</span>
+              <span class="wheel-lens-arrow">◀</span>
+            </div>
+            <div class="time-wheel-fade-top"></div>
+            <div class="time-wheel-fade-bottom"></div>
+            <div class="time-wheel-track" id="timeWheelTrack"></div>
+          </div>
+
+          <div class="time-wheel-footer">
+            <span class="time-wheel-hint">💡 Chạm card Bắt đầu / Kết thúc • Vuốt bánh xe để cuộn giây</span>
+          </div>
         </div>
 
         <!-- Quick chips -->
-        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-          <button type="button" id="chipStartFromZero" class="btn btn-tonal btn-sm">From Start (0s)</button>
-          <button type="button" id="chipEndAtTotal" class="btn btn-tonal btn-sm">To End of File</button>
+        <div class="quick-chips-row">
+          <button type="button" id="chipStartFromZero" class="btn btn-tonal btn-sm">Từ đầu (0s)</button>
+          <button type="button" id="chipEndAtTotal" class="btn btn-tonal btn-sm">Đến hết bài</button>
         </div>
 
         <div id="rangeErrorAlert" class="form-helper error hidden"></div>
@@ -485,6 +532,6 @@
   </div>
 
   <!-- Application Logic with Cache-Busting adhering to pwa-standards.md -->
-  <script defer src="./app.js?v=16"></script>
+  <script defer src="./app.js?v=21"></script>
 </body>
 </html>

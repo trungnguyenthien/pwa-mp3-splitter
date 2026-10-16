@@ -1025,13 +1025,18 @@ body {
     max-width: 100%;
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
-    max-height: 85vh;
+    max-height: 92vh;
     padding-bottom: var(--safe-bottom);
     transform: translateY(100%);
   }
 
   .dialog-backdrop.open .dialog-panel {
     transform: translateY(0);
+  }
+
+  .range-dialog-body {
+    padding: 12px 14px;
+    gap: 10px;
   }
 
   .part-item {
@@ -1042,6 +1047,19 @@ body {
   .part-actions {
     justify-content: flex-end;
   }
+}
+
+.range-dialog-panel {
+  max-width: 440px;
+}
+
+.range-dialog-body {
+  padding: 16px 20px;
+  gap: 12px;
+}
+
+.range-dialog-body > * {
+  flex-shrink: 0;
 }
 
 /* Form inputs & Range Sliders */
@@ -1125,6 +1143,439 @@ input[type="range"]::-moz-range-thumb {
 
 .form-helper.error {
   color: var(--md-sys-color-error);
+}
+
+.form-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.btn-chip-sm {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background-color: var(--md-sys-color-surface-variant);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--radius-xs);
+  color: var(--md-sys-color-primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-chip-sm:hover,
+.btn-chip-sm.active {
+  background-color: var(--md-sys-color-primary-container);
+  border-color: var(--md-sys-color-primary);
+}
+
+.input-text.input-active-wheel {
+  border-color: var(--md-sys-color-primary);
+  box-shadow: 0 0 0 3px rgba(0, 230, 118, 0.25);
+}
+
+/* =============================================================================
+   Mobile-First Dual Time Cards & Time Range Picker
+   ============================================================================= */
+.time-cards-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.time-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 10px;
+  background-color: #13151b;
+  border: 1.5px solid #252832;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  -webkit-user-select: none;
+  position: relative;
+  text-align: center;
+}
+
+.time-card:hover {
+  border-color: #3b3f4e;
+  background-color: #171a22;
+}
+
+.time-card.active {
+  background-color: #0b2314;
+  border-color: var(--md-sys-color-primary);
+  box-shadow: 0 0 12px rgba(0, 230, 118, 0.22), inset 0 1px 1px rgba(0, 230, 118, 0.2);
+}
+
+.time-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: 100%;
+  margin-bottom: 2px;
+}
+
+.time-card-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: #4a5060;
+  transition: all 0.2s ease;
+}
+
+.time-card.active .time-card-dot {
+  background-color: var(--md-sys-color-primary);
+  box-shadow: 0 0 6px var(--md-sys-color-primary);
+}
+
+.time-card-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--md-sys-color-on-surface-variant);
+  transition: color 0.2s ease;
+}
+
+.time-card.active .time-card-title {
+  color: var(--md-sys-color-primary);
+}
+
+.time-card-badge {
+  font-size: 0.65rem;
+  color: #646a7a;
+  text-transform: uppercase;
+}
+
+.time-card.active .time-card-badge {
+  color: rgba(0, 230, 118, 0.75);
+}
+
+.time-card-input-wrapper {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.time-card-input {
+  width: 100%;
+  max-width: 120px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: #d1d5db;
+  font-size: 1.35rem;
+  font-weight: 700;
+  text-align: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  padding: 1px 2px;
+  outline: none;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.time-card.active .time-card-input {
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(0, 230, 118, 0.4);
+}
+
+.time-card-input:focus {
+  background-color: rgba(0, 0, 0, 0.45);
+  box-shadow: 0 0 0 1.5px var(--md-sys-color-primary);
+}
+
+.time-card-sub {
+  font-size: 0.7rem;
+  color: #717786;
+  margin-top: 1px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.time-card.active .time-card-sub {
+  color: #a4adbd;
+}
+
+/* Duration Pill */
+.time-duration-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 5px 12px;
+  background-color: #12141a;
+  border: 1px solid #232630;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  color: var(--md-sys-color-on-surface-variant);
+  align-self: center;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.time-duration-pill svg {
+  color: var(--md-sys-color-primary);
+  flex-shrink: 0;
+}
+
+.time-duration-pill .duration-val {
+  color: #eceff1;
+  font-weight: 700;
+}
+
+.time-duration-pill.is-invalid {
+  border-color: rgba(255, 82, 82, 0.45);
+  background-color: rgba(255, 82, 82, 0.1);
+}
+
+.time-duration-pill.is-invalid svg,
+.time-duration-pill.is-invalid .duration-val {
+  color: var(--md-sys-color-error);
+}
+
+/* =============================================================================
+   WavePad DAW Jog Drum Time Wheel (Mobile-First, Always Visible)
+   ============================================================================= */
+.time-wheel-container {
+  background-color: #090a0d;
+  border: 1.5px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  margin: 0;
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.8), 0 4px 12px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.time-wheel-header {
+  background-color: #14161c;
+  padding: 6px 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid #1e2129;
+  flex-shrink: 0;
+}
+
+.time-wheel-target-info {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+}
+
+.wheel-target-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--md-sys-color-primary);
+  box-shadow: 0 0 6px var(--md-sys-color-primary);
+}
+
+.wheel-target-label {
+  color: var(--md-sys-color-on-surface-variant);
+  font-size: 0.74rem;
+}
+
+.wheel-target-name {
+  color: var(--md-sys-color-primary);
+  font-weight: 700;
+  font-size: 0.78rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.time-wheel-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.btn-wheel-step {
+  background-color: #1d2028;
+  border: 1px solid #303442;
+  color: #eceff1;
+  border-radius: 5px;
+  padding: 3px 7px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  touch-action: manipulation;
+}
+
+.btn-wheel-step:active {
+  background-color: #10381e;
+  border-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-primary);
+  transform: scale(0.96);
+}
+
+.time-wheel-viewport {
+  position: relative;
+  height: 140px;
+  min-height: 140px;
+  max-height: 140px;
+  flex-shrink: 0;
+  background-color: #07080a;
+  overflow-y: scroll;
+  overflow-x: hidden !important;
+  scroll-snap-type: y mandatory;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  user-select: none;
+  -webkit-user-select: none;
+  outline: none;
+  cursor: grab;
+}
+
+/* Hide scrollbars completely across WebKit */
+.time-wheel-viewport::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.time-wheel-viewport:active {
+  cursor: grabbing;
+}
+
+.time-wheel-lens {
+  position: absolute;
+  top: 50%;
+  left: 6px;
+  right: 6px;
+  height: 36px;
+  transform: translateY(-50%);
+  border-top: 1.5px solid var(--md-sys-color-primary);
+  border-bottom: 1.5px solid var(--md-sys-color-primary);
+  background: linear-gradient(90deg, rgba(0, 230, 118, 0.05), rgba(0, 230, 118, 0.12), rgba(0, 230, 118, 0.05));
+  box-shadow: 0 0 12px rgba(0, 230, 118, 0.25);
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 4;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 10px;
+}
+
+.wheel-lens-arrow {
+  color: var(--md-sys-color-primary);
+  font-size: 0.65rem;
+  text-shadow: 0 0 6px var(--md-sys-color-primary);
+  opacity: 0.85;
+}
+
+.time-wheel-fade-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 48px;
+  background: linear-gradient(180deg, #07080a 15%, rgba(7, 8, 10, 0.8) 55%, transparent 100%);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.time-wheel-fade-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 48px;
+  background: linear-gradient(0deg, #07080a 15%, rgba(7, 8, 10, 0.8) 55%, transparent 100%);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.time-wheel-track {
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  padding-top: 52px;
+  padding-bottom: 52px;
+}
+
+.wheel-item {
+  height: 36px;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  scroll-snap-align: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.92rem;
+  color: #727888;
+  opacity: 0.45;
+  transition: opacity 0.12s ease, color 0.12s ease;
+  cursor: pointer;
+  content-visibility: auto;
+  contain-intrinsic-size: 36px;
+}
+
+.wheel-item:hover,
+.wheel-item:active {
+  opacity: 0.85;
+  color: #eceff1;
+}
+
+.wheel-item.is-selected {
+  color: var(--md-sys-color-primary);
+  font-size: 1.15rem;
+  font-weight: 700;
+  opacity: 1;
+  text-shadow: 0 0 10px rgba(0, 230, 118, 0.65);
+}
+
+.wheel-sec-num {
+  font-weight: 700;
+}
+
+.wheel-sep {
+  opacity: 0.4;
+  font-size: 0.8em;
+}
+
+.wheel-time-fmt {
+  opacity: 0.9;
+  font-size: 0.9em;
+}
+
+.time-wheel-footer {
+  background-color: #101217;
+  padding: 5px 10px;
+  border-top: 1px solid #1a1c23;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.time-wheel-hint {
+  font-size: 0.7rem;
+  color: var(--md-sys-color-on-surface-variant);
+  opacity: 0.85;
+}
+
+.quick-chips-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 /* Auto Split Suggestions List */

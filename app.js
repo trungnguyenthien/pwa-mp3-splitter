@@ -157,18 +157,30 @@ function initElements() {
     valMinPart: document.getElementById('valMinPart'),
     btnReanalyze: document.getElementById('btnReanalyze'),
 
-    // Time Range Dialog
+    // Time Range Dialog & Time Wheel Spinner
     rangeDialog: document.getElementById('rangeDialog'),
     btnCloseRangeDialog: document.getElementById('btnCloseRangeDialog'),
     btnCancelRange: document.getElementById('btnCancelRange'),
     btnAddPartRange: document.getElementById('btnAddPartRange'),
+    cardRangeStart: document.getElementById('cardRangeStart'),
+    cardRangeEnd: document.getElementById('cardRangeEnd'),
     inputRangeStart: document.getElementById('inputRangeStart'),
     inputRangeEnd: document.getElementById('inputRangeEnd'),
     rangeStartHelper: document.getElementById('rangeStartHelper'),
     rangeEndHelper: document.getElementById('rangeEndHelper'),
+    rangeDurationPill: document.getElementById('rangeDurationPill'),
+    rangeDurationText: document.getElementById('rangeDurationText'),
     rangeErrorAlert: document.getElementById('rangeErrorAlert'),
     chipStartFromZero: document.getElementById('chipStartFromZero'),
     chipEndAtTotal: document.getElementById('chipEndAtTotal'),
+    timeWheelContainer: document.getElementById('timeWheelContainer'),
+    wheelTargetText: document.getElementById('wheelTargetText'),
+    timeWheelViewport: document.getElementById('timeWheelViewport'),
+    timeWheelTrack: document.getElementById('timeWheelTrack'),
+    btnWheelStepMinus10: document.getElementById('btnWheelStepMinus10'),
+    btnWheelStepMinus1: document.getElementById('btnWheelStepMinus1'),
+    btnWheelStepPlus1: document.getElementById('btnWheelStepPlus1'),
+    btnWheelStepPlus10: document.getElementById('btnWheelStepPlus10'),
 
     // iOS Install Modal
     iosInstallModal: document.getElementById('iosInstallModal'),
@@ -436,25 +448,142 @@ function initEvents() {
     });
   }
 
-  // Range Dialog actions
+  // Range Dialog & Time Wheel actions
   if (elements.btnCloseRangeDialog) elements.btnCloseRangeDialog.addEventListener('click', () => closeDialog());
   if (elements.btnCancelRange) elements.btnCancelRange.addEventListener('click', () => closeDialog());
   if (elements.btnAddPartRange) elements.btnAddPartRange.addEventListener('click', addRangePart);
-  if (elements.inputRangeStart) elements.inputRangeStart.addEventListener('input', validateRangeInputs);
-  if (elements.inputRangeEnd) elements.inputRangeEnd.addEventListener('input', validateRangeInputs);
+
+  // Dual Touch Cards for Start & End Time
+  if (elements.cardRangeStart) {
+    elements.cardRangeStart.addEventListener('click', () => openTimeWheel('start'));
+  }
+  if (elements.cardRangeEnd) {
+    elements.cardRangeEnd.addEventListener('click', () => openTimeWheel('end'));
+  }
+
+  if (elements.inputRangeStart) {
+    elements.inputRangeStart.addEventListener('focus', () => openTimeWheel('start'));
+    elements.inputRangeStart.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openTimeWheel('start');
+    });
+    elements.inputRangeStart.addEventListener('input', () => {
+      validateRangeInputs();
+      updateWheelBadges();
+      if (activeWheelTarget === 'start') {
+        const val = parseTimeToSeconds(elements.inputRangeStart.value);
+        if (!isNaN(val)) {
+          scrollToWheelSec(Math.round(val), 'smooth');
+        }
+      }
+    });
+    elements.inputRangeStart.addEventListener('blur', () => {
+      const val = parseTimeToSeconds(elements.inputRangeStart.value);
+      if (!isNaN(val)) {
+        elements.inputRangeStart.value = formatMmSs(val);
+      }
+      validateRangeInputs();
+      updateWheelBadges();
+    });
+  }
+
+  if (elements.inputRangeEnd) {
+    elements.inputRangeEnd.addEventListener('focus', () => openTimeWheel('end'));
+    elements.inputRangeEnd.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openTimeWheel('end');
+    });
+    elements.inputRangeEnd.addEventListener('input', () => {
+      validateRangeInputs();
+      updateWheelBadges();
+      if (activeWheelTarget === 'end') {
+        const val = parseTimeToSeconds(elements.inputRangeEnd.value);
+        if (!isNaN(val)) {
+          scrollToWheelSec(Math.round(val), 'smooth');
+        }
+      }
+    });
+    elements.inputRangeEnd.addEventListener('blur', () => {
+      const val = parseTimeToSeconds(elements.inputRangeEnd.value);
+      if (!isNaN(val)) {
+        elements.inputRangeEnd.value = formatMmSs(val);
+      }
+      validateRangeInputs();
+      updateWheelBadges();
+    });
+  }
+
+  if (elements.btnWheelStepMinus10) elements.btnWheelStepMinus10.addEventListener('click', () => stepWheel(-10));
+  if (elements.btnWheelStepMinus1) elements.btnWheelStepMinus1.addEventListener('click', () => stepWheel(-1));
+  if (elements.btnWheelStepPlus1) elements.btnWheelStepPlus1.addEventListener('click', () => stepWheel(1));
+  if (elements.btnWheelStepPlus10) elements.btnWheelStepPlus10.addEventListener('click', () => stepWheel(10));
+
+  if (elements.timeWheelViewport) {
+    elements.timeWheelViewport.addEventListener('scroll', onWheelViewportScroll, { passive: true });
+
+    elements.timeWheelViewport.addEventListener('wheel', (e) => {
+      if (Math.abs(e.deltaY) >= 12) {
+        e.preventDefault();
+        const step = e.shiftKey ? 10 : 1;
+        const dir = e.deltaY > 0 ? 1 : -1;
+        stepWheel(dir * step);
+      }
+    }, { passive: false });
+
+    elements.timeWheelViewport.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+        e.preventDefault();
+        stepWheel(e.shiftKey ? -10 : -1);
+      } else if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        stepWheel(e.shiftKey ? 10 : 1);
+      } else if (e.key === 'PageUp') {
+        e.preventDefault();
+        stepWheel(-10);
+      } else if (e.key === 'PageDown') {
+        e.preventDefault();
+        stepWheel(10);
+      }
+    });
+  }
+
+  if (elements.timeWheelTrack) {
+    elements.timeWheelTrack.addEventListener('click', (e) => {
+      const item = e.target.closest('.wheel-item');
+      if (!item) return;
+      const sec = parseInt(item.dataset.sec, 10);
+      if (!isNaN(sec)) {
+        const targetInput = activeWheelTarget === 'start' ? elements.inputRangeStart : elements.inputRangeEnd;
+        if (targetInput) {
+          targetInput.value = formatMmSs(sec);
+          validateRangeInputs();
+          updateWheelBadges();
+          scrollToWheelSec(sec, 'smooth');
+        }
+      }
+    });
+  }
 
   if (elements.chipStartFromZero) {
     elements.chipStartFromZero.addEventListener('click', () => {
-      elements.inputRangeStart.value = '0';
-      validateRangeInputs();
+      if (elements.inputRangeStart) {
+        elements.inputRangeStart.value = '00:00';
+        openTimeWheel('start');
+        validateRangeInputs();
+        updateWheelBadges();
+        scrollToWheelSec(0, 'smooth');
+      }
     });
   }
 
   if (elements.chipEndAtTotal) {
     elements.chipEndAtTotal.addEventListener('click', () => {
-      if (state.index) {
-        elements.inputRangeEnd.value = state.index.duration.toFixed(2);
+      if (elements.inputRangeEnd && state.index) {
+        elements.inputRangeEnd.value = formatMmSs(state.index.duration);
+        openTimeWheel('end');
         validateRangeInputs();
+        updateWheelBadges();
+        scrollToWheelSec(Math.round(state.index.duration), 'smooth');
       }
     });
   }
@@ -1546,6 +1675,170 @@ function addSelectedSuggestions() {
 }
 
 // =============================================================================
+// Time Wheel Spinner Controller (DAW Jog Wheel) & mm:ss Helpers
+// =============================================================================
+function formatMmSs(seconds) {
+  if (isNaN(seconds) || seconds < 0) return '00:00';
+  const totalRounded = Math.round(seconds);
+  const mins = Math.floor(totalRounded / 60);
+  const secs = totalRounded % 60;
+  const mStr = String(mins).padStart(2, '0');
+  const sStr = String(secs).padStart(2, '0');
+  return `${mStr}:${sStr}`;
+}
+
+function parseTimeToSeconds(val) {
+  if (typeof val === 'number') return isNaN(val) ? NaN : val;
+  if (!val || typeof val !== 'string') return NaN;
+  const trimmed = val.trim();
+  if (!trimmed) return NaN;
+
+  if (trimmed.includes(':')) {
+    const parts = trimmed.split(':');
+    if (parts.length === 2) {
+      const mins = parseFloat(parts[0]);
+      const secs = parseFloat(parts[1]);
+      if (isNaN(mins) || isNaN(secs)) return NaN;
+      return mins * 60 + secs;
+    } else if (parts.length === 3) {
+      const hrs = parseFloat(parts[0]);
+      const mins = parseFloat(parts[1]);
+      const secs = parseFloat(parts[2]);
+      if (isNaN(hrs) || isNaN(mins) || isNaN(secs)) return NaN;
+      return hrs * 3600 + mins * 60 + secs;
+    }
+  }
+
+  const num = parseFloat(trimmed.replace(',', '.'));
+  return isNaN(num) ? NaN : num;
+}
+
+const WHEEL_ITEM_HEIGHT = 36;
+let activeWheelTarget = 'start'; // 'start' | 'end'
+let wheelMaxSec = 300;
+let builtWheelDuration = -1;
+let isProgrammaticWheelScroll = false;
+let wheelScrollRaf = null;
+let scrollResetTimeout = null;
+let lastSelectedSec = -1;
+
+function buildTimeWheelTrack(duration) {
+  if (!elements.timeWheelTrack) return;
+  const maxSec = Math.max(10, Math.ceil(duration || 300));
+  if (builtWheelDuration === maxSec && elements.timeWheelTrack.childElementCount > 0) {
+    wheelMaxSec = maxSec;
+    return;
+  }
+  wheelMaxSec = maxSec;
+  builtWheelDuration = maxSec;
+
+  const frag = document.createDocumentFragment();
+  for (let s = 0; s <= maxSec; s++) {
+    const item = document.createElement('div');
+    item.className = 'wheel-item';
+    item.dataset.sec = String(s);
+    item.innerHTML = `<span class="wheel-time-fmt">${formatMmSs(s)}</span><span class="wheel-sep">•</span><span class="wheel-sec-num">${s}s</span>`;
+    frag.appendChild(item);
+  }
+  elements.timeWheelTrack.innerHTML = '';
+  elements.timeWheelTrack.appendChild(frag);
+}
+
+function openTimeWheel(targetField = 'start') {
+  if (!elements.timeWheelContainer) return;
+  activeWheelTarget = targetField;
+
+  if (state.index && state.index.duration) {
+    buildTimeWheelTrack(state.index.duration);
+  }
+
+  if (elements.cardRangeStart) elements.cardRangeStart.classList.toggle('active', targetField === 'start');
+  if (elements.cardRangeEnd) elements.cardRangeEnd.classList.toggle('active', targetField === 'end');
+
+  updateWheelBadges();
+
+  const targetInput = targetField === 'start' ? elements.inputRangeStart : elements.inputRangeEnd;
+  const currentVal = targetInput ? Math.round(parseTimeToSeconds(targetInput.value) || 0) : 0;
+
+  requestAnimationFrame(() => {
+    scrollToWheelSec(currentVal, 'auto');
+  });
+}
+
+function closeTimeWheel() {
+  // Wheel remains permanently visible on mobile layout
+}
+
+function scrollToWheelSec(sec, behavior = 'auto') {
+  if (!elements.timeWheelViewport) return;
+  const clampedSec = Math.max(0, Math.min(wheelMaxSec, Math.round(sec)));
+  isProgrammaticWheelScroll = true;
+
+  elements.timeWheelViewport.scrollTo({
+    top: clampedSec * WHEEL_ITEM_HEIGHT,
+    behavior,
+  });
+
+  updateSelectedWheelItem(clampedSec);
+
+  if (scrollResetTimeout) clearTimeout(scrollResetTimeout);
+  scrollResetTimeout = setTimeout(() => {
+    isProgrammaticWheelScroll = false;
+  }, behavior === 'smooth' ? 300 : 50);
+}
+
+function updateSelectedWheelItem(activeSec) {
+  if (!elements.timeWheelTrack || lastSelectedSec === activeSec) return;
+  lastSelectedSec = activeSec;
+
+  const currentSel = elements.timeWheelTrack.querySelector('.wheel-item.is-selected');
+  if (currentSel) currentSel.classList.remove('is-selected');
+
+  const targetItem = elements.timeWheelTrack.querySelector(`.wheel-item[data-sec="${activeSec}"]`);
+  if (targetItem) targetItem.classList.add('is-selected');
+}
+
+function updateWheelBadges() {
+  const isStart = activeWheelTarget === 'start';
+  const targetInput = isStart ? elements.inputRangeStart : elements.inputRangeEnd;
+  const curVal = targetInput ? targetInput.value : '00:00';
+  if (elements.wheelTargetText) {
+    elements.wheelTargetText.textContent = isStart ? `Bắt đầu (${curVal})` : `Kết thúc (${curVal})`;
+  }
+}
+
+function stepWheel(delta) {
+  const targetInput = activeWheelTarget === 'start' ? elements.inputRangeStart : elements.inputRangeEnd;
+  if (!targetInput) return;
+
+  const current = parseTimeToSeconds(targetInput.value) || 0;
+  const next = Math.max(0, Math.min(wheelMaxSec, Math.round(current + delta)));
+  targetInput.value = formatMmSs(next);
+  validateRangeInputs();
+  updateWheelBadges();
+  scrollToWheelSec(next, 'smooth');
+}
+
+function onWheelViewportScroll() {
+  if (isProgrammaticWheelScroll || !elements.timeWheelViewport) return;
+
+  if (wheelScrollRaf) cancelAnimationFrame(wheelScrollRaf);
+  wheelScrollRaf = requestAnimationFrame(() => {
+    const scrollTop = elements.timeWheelViewport.scrollTop;
+    const sec = Math.max(0, Math.min(wheelMaxSec, Math.round(scrollTop / WHEEL_ITEM_HEIGHT)));
+
+    const targetInput = activeWheelTarget === 'start' ? elements.inputRangeStart : elements.inputRangeEnd;
+    const mmSsVal = formatMmSs(sec);
+    if (targetInput && targetInput.value !== mmSsVal) {
+      targetInput.value = mmSsVal;
+      validateRangeInputs();
+      updateWheelBadges();
+    }
+    updateSelectedWheelItem(sec);
+  });
+}
+
+// =============================================================================
 // Time Range Dialog Logic
 // =============================================================================
 function openRangeDialog() {
@@ -1554,31 +1847,55 @@ function openRangeDialog() {
   state.ui.dialog = 'range';
   elements.rangeDialog.classList.add('open');
 
-  elements.inputRangeStart.value = '0';
-  elements.inputRangeEnd.value = Math.min(60, state.index.duration).toFixed(1);
+  elements.inputRangeStart.value = '00:00';
+  elements.inputRangeEnd.value = formatMmSs(Math.min(60, state.index.duration));
   validateRangeInputs();
+
+  // Initialize and open time wheel on Start Time
+  buildTimeWheelTrack(state.index.duration);
+  openTimeWheel('start');
 }
 
 function validateRangeInputs() {
   if (!state.index) return;
 
-  const startVal = parseFloat(elements.inputRangeStart.value);
-  const endVal = parseFloat(elements.inputRangeEnd.value);
+  const startVal = parseTimeToSeconds(elements.inputRangeStart.value);
+  const endVal = parseTimeToSeconds(elements.inputRangeEnd.value);
   const duration = state.index.duration;
 
-  elements.rangeStartHelper.textContent = `Preview: ${formatTime(startVal || 0)}`;
-  elements.rangeEndHelper.textContent = `Preview: ${formatTime(endVal || 0)}`;
+  if (elements.rangeStartHelper) {
+    elements.rangeStartHelper.textContent = isNaN(startVal)
+      ? '00:00.0 (0s)'
+      : `${formatMmSs(startVal)}.0 (${Math.round(startVal)}s)`;
+  }
+
+  if (elements.rangeEndHelper) {
+    elements.rangeEndHelper.textContent = isNaN(endVal)
+      ? '00:00.0 (0s)'
+      : `${formatMmSs(endVal)}.0 (${Math.round(endVal)}s)`;
+  }
 
   let errorMsg = '';
+  const partDuration = endVal - startVal;
 
   if (isNaN(startVal) || startVal < 0) {
-    errorMsg = 'Start time must be 0 or greater.';
+    errorMsg = 'Thời gian bắt đầu không hợp lệ (mm:ss) ≥ 00:00.';
   } else if (isNaN(endVal) || endVal > duration) {
-    errorMsg = `End time cannot exceed total duration (${formatTime(duration)}).`;
+    errorMsg = `Thời gian kết thúc không được vượt quá độ dài bài (${formatMmSs(duration)}).`;
   } else if (endVal <= startVal) {
-    errorMsg = 'End time must be greater than start time.';
-  } else if (endVal - startVal < 1.0) {
-    errorMsg = 'Part duration must be at least 1.0 second.';
+    errorMsg = 'Thời gian kết thúc phải lớn hơn thời gian bắt đầu.';
+  } else if (partDuration < 1.0) {
+    errorMsg = 'Thời lượng đoạn phải từ 1.0 giây trở lên.';
+  }
+
+  if (elements.rangeDurationText) {
+    if (isNaN(startVal) || isNaN(endVal) || endVal <= startVal) {
+      elements.rangeDurationText.textContent = '--:-- (0s)';
+      if (elements.rangeDurationPill) elements.rangeDurationPill.classList.add('is-invalid');
+    } else {
+      elements.rangeDurationText.textContent = `${formatMmSs(partDuration)} (${Math.round(partDuration)}s)`;
+      if (elements.rangeDurationPill) elements.rangeDurationPill.classList.remove('is-invalid');
+    }
   }
 
   if (errorMsg) {
@@ -1594,8 +1911,10 @@ function validateRangeInputs() {
 function addRangePart() {
   if (!state.index) return;
 
-  const startSec = parseFloat(elements.inputRangeStart.value);
-  const endSec = parseFloat(elements.inputRangeEnd.value);
+  const startSec = parseTimeToSeconds(elements.inputRangeStart.value);
+  const endSec = parseTimeToSeconds(elements.inputRangeEnd.value);
+  if (isNaN(startSec) || isNaN(endSec)) return;
+
   const frameDuration = state.index.frameDuration;
 
   const snappedStart = Math.floor(startSec / frameDuration) * frameDuration;
@@ -2104,6 +2423,7 @@ function closeDialog() {
   if (elements.rangeDialog) elements.rangeDialog.classList.remove('open');
   if (elements.fileInfoDialog) elements.fileInfoDialog.classList.remove('open');
   if (elements.iosInstallModal) elements.iosInstallModal.classList.remove('open');
+  closeTimeWheel();
   state.ui.dialog = null;
   if (state.ui.previewId) {
     stopPreview();
