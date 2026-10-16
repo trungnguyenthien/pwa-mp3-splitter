@@ -7,7 +7,7 @@
   <meta name="description" content="Split MP3 audio files fast, losslessly and 100% offline in your browser. Zero quality loss, no server upload, frame-accurate cutting.">
 
   <!-- PWA & Mobile Capabilities -->
-  <link rel="manifest" href="./manifest.webmanifest?v=27">
+  <link rel="manifest" href="./manifest.webmanifest?v=28">
   <meta name="theme-color" content="#141518">
   <meta name="mobile-web-app-capable" content="yes">
   
@@ -22,7 +22,7 @@
   <link rel="icon" type="image/png" href="./icons/favicon.png">
 
   <!-- Versioned Stylesheet adhering to pwa-standards.md -->
-  <link rel="stylesheet" href="./styles.css?v=27">
+  <link rel="stylesheet" href="./styles.css?v=28">
 </head>
 <body>
 
@@ -65,7 +65,7 @@
     <section class="card" id="filePickerCard">
       <!-- Empty Dropzone State (using native label for 100% reliable click activation) -->
       <label for="fileInput" id="dropzone" class="dropzone" tabindex="0" aria-label="Click or drop MP3 file here">
-        <input type="file" id="fileInput" accept=".mp3,audio/mpeg,audio/mp3" class="visually-hidden">
+        <input type="file" id="fileInput" accept=".mp3" class="visually-hidden">
         <h2 class="visually-hidden">Choose or Drop an MP3 File</h2>
         <div class="dropzone-action">
           <span class="btn btn-primary" id="btnChooseFile">
@@ -76,7 +76,7 @@
             </svg>
             <span>Choose MP3 File</span>
           </span>
-          <span class="dropzone-hint">or drop file here</span>
+          <span class="dropzone-hint">or drop .mp3 file here</span>
         </div>
       </label>
 
@@ -573,6 +573,6 @@
   </div>
 
   <!-- Application Logic with Cache-Busting adhering to pwa-standards.md -->
-  <script defer src="./app.js?v=27"></script>
+  <script defer src="./app.js?v=28"></script>
 </body>
 </html>
