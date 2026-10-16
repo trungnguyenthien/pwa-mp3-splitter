@@ -22,7 +22,7 @@
   <link rel="icon" type="image/png" href="./icons/favicon.png">
 
   <!-- Versioned Stylesheet adhering to pwa-standards.md -->
-  <link rel="stylesheet" href="./styles.css?v=21">
+  <link rel="stylesheet" href="./styles.css?v=24">
 </head>
 <body>
 
@@ -81,24 +81,23 @@
       </label>
 
       <!-- Loaded File Details Card (hidden initially) -->
-      <div id="fileInfoSection" class="card hidden">
-        <div class="file-info-header">
-          <div class="file-title-area">
-            <div class="file-music-icon" aria-hidden="true">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M9 18V5l12-2v13"/>
-                <circle cx="6" cy="18" r="3"/>
-                <circle cx="18" cy="16" r="3"/>
-              </svg>
-            </div>
-            <div class="file-title-text">
-              <div id="fileNameDisplay" class="file-name" title="Loaded file">sample.mp3</div>
-              <div id="fileSubtext" class="file-subtext">Indexed &amp; ready to split</div>
-            </div>
-          </div>
+      <div id="fileInfoSection" class="card file-loaded-card hidden">
+        <div class="file-music-icon" aria-hidden="true">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 18V5l12-2v13"/>
+            <circle cx="6" cy="18" r="3"/>
+            <circle cx="18" cy="16" r="3"/>
+          </svg>
         </div>
 
-        <div class="file-toolbar-row">
+        <div class="file-info-content">
+          <!-- Row 1: File Title & Status -->
+          <div class="file-title-text">
+            <div id="fileNameDisplay" class="file-name" title="Loaded file">sample.mp3</div>
+            <div id="fileSubtext" class="file-subtext">Indexed &amp; ready to split</div>
+          </div>
+
+          <!-- Row 2: Duration & Size Stats -->
           <div class="file-stats-group">
             <div class="stat-pill">
               <span class="stat-label">Duration:</span>
@@ -109,6 +108,8 @@
               <span id="statSize" class="stat-value tabular-nums">0 MB</span>
             </div>
           </div>
+
+          <!-- Row 3: Action Buttons (Song Info & Change File) -->
           <div class="file-actions-group">
             <button type="button" id="btnOpenFileInfo" class="btn btn-tonal btn-sm" aria-label="Show MP3 file details" title="View technical audio details">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -116,15 +117,15 @@
                 <line x1="12" y1="16" x2="12" y2="12"/>
                 <line x1="12" y1="8" x2="12.01" y2="8"/>
               </svg>
-              <span>Info</span>
+              <span>Song Info</span>
             </button>
-            <label for="fileInput" id="btnChangeFile" class="btn btn-text btn-sm btn-change-file" aria-label="Change current file" style="cursor: pointer;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <label for="fileInput" id="btnChangeFile" class="btn btn-tonal btn-sm btn-change-file" aria-label="Change current file" style="cursor: pointer;">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
                 <polyline points="17 8 12 3 7 8"/>
                 <line x1="12" y1="3" x2="12" y2="15"/>
               </svg>
-              <span>Change file</span>
+              <span>Change File</span>
             </label>
           </div>
         </div>
@@ -532,6 +533,6 @@
   </div>
 
   <!-- Application Logic with Cache-Busting adhering to pwa-standards.md -->
-  <script defer src="./app.js?v=21"></script>
+  <script defer src="./app.js?v=24"></script>
 </body>
 </html>
