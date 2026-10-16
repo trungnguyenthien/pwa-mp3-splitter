@@ -7,7 +7,7 @@
   <meta name="description" content="Split MP3 audio files fast, losslessly and 100% offline in your browser. Zero quality loss, no server upload, frame-accurate cutting.">
 
   <!-- PWA & Mobile Capabilities -->
-  <link rel="manifest" href="./manifest.webmanifest?v=28">
+  <link rel="manifest" href="./manifest.webmanifest?v=29">
   <meta name="theme-color" content="#141518">
   <meta name="mobile-web-app-capable" content="yes">
   
@@ -22,7 +22,7 @@
   <link rel="icon" type="image/png" href="./icons/favicon.png">
 
   <!-- Versioned Stylesheet adhering to pwa-standards.md -->
-  <link rel="stylesheet" href="./styles.css?v=28">
+  <link rel="stylesheet" href="./styles.css?v=30">
 </head>
 <body>
 
@@ -64,9 +64,9 @@
     <!-- Card 1: File Picker / File Info -->
     <section class="card" id="filePickerCard">
       <!-- Empty Dropzone State (using native label for 100% reliable click activation) -->
-      <label for="fileInput" id="dropzone" class="dropzone" tabindex="0" aria-label="Click or drop MP3 file here">
-        <input type="file" id="fileInput" accept=".mp3" class="visually-hidden">
-        <h2 class="visually-hidden">Choose or Drop an MP3 File</h2>
+      <label for="fileInput" id="dropzone" class="dropzone" tabindex="0" aria-label="Click or drop MP3 or M4A file here">
+        <input type="file" id="fileInput" accept=".mp3,.m4a,audio/mpeg,audio/mp4,audio/x-m4a" class="visually-hidden">
+        <h2 class="visually-hidden">Choose or Drop an Audio File (.mp3, .m4a)</h2>
         <div class="dropzone-action">
           <span class="btn btn-primary" id="btnChooseFile">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -74,9 +74,9 @@
               <polyline points="17 8 12 3 7 8"/>
               <line x1="12" y1="3" x2="12" y2="15"/>
             </svg>
-            <span>Choose MP3 File</span>
+            <span>Choose MP3 / M4A File</span>
           </span>
-          <span class="dropzone-hint">or drop .mp3 file here</span>
+          <span class="dropzone-hint">or drop .mp3, .m4a file here</span>
         </div>
       </label>
 
@@ -551,14 +551,14 @@
         </div>
 
         <div style="background: var(--md-sys-color-surface-variant); border: 1px solid var(--md-sys-color-outline-variant); border-radius: var(--radius-md); padding: 12px 14px; font-size: 0.8125rem; color: var(--md-sys-color-on-surface-variant); line-height: 1.45;">
-          <strong style="color: var(--md-sys-color-primary); display: block; margin-bottom: 4px;">Why does MP3 Splitter only accept .mp3?</strong>
-          This application cuts audio <strong>losslessly (zero re-encoding)</strong> directly at MPEG-1/2 Layer III frame boundaries. Non-MP3 files (such as <code>.m4a</code>, <code>.aac</code>, <code>.wav</code>) lack this frame structure, causing false durations (e.g. only a few seconds) and corrupt split outputs.
+          <strong style="color: var(--md-sys-color-primary); display: block; margin-bottom: 4px;">Supported Audio Formats</strong>
+          This application cuts audio <strong>losslessly (zero re-encoding)</strong> directly at frame boundaries for <strong>.mp3</strong> (MPEG Layer III) and <strong>.m4a</strong> (Apple AAC) files. Other formats (such as <code>.wav</code>, <code>.flac</code>, <code>.ogg</code>) are not currently supported.
         </div>
       </div>
 
       <div class="dialog-footer" style="display: flex; gap: 10px; justify-content: flex-end;">
         <button id="btnDismissFormatModal" type="button" class="btn btn-tonal">Close</button>
-        <button id="btnChooseMp3Instead" type="button" class="btn btn-primary">Choose .mp3 File</button>
+        <button id="btnChooseMp3Instead" type="button" class="btn btn-primary">Choose .mp3 / .m4a File</button>
       </div>
     </div>
   </div>
@@ -573,6 +573,6 @@
   </div>
 
   <!-- Application Logic with Cache-Busting adhering to pwa-standards.md -->
-  <script defer src="./app.js?v=28"></script>
+  <script defer src="./app.js?v=30"></script>
 </body>
 </html>

@@ -208,7 +208,7 @@ function initElements() {
 function initWorker() {
   try {
     if (window.Worker && window.location.protocol !== 'file:') {
-      mp3Worker = new Worker('./mp3-worker.js?v=28');
+      mp3Worker = new Worker('./mp3-worker.js?v=30');
       mp3Worker.onmessage = handleWorkerMessage;
       mp3Worker.onerror = (err) => {
         console.warn('Worker error, switching to in-thread processing:', err);
@@ -783,14 +783,14 @@ async function processSelectedFile(file) {
 
   renderParts();
 
-  showLoading('Reading MP3 file into memory...', `Processing "${file.name}"...`);
+  showLoading('Reading audio file into memory...', `Processing "${file.name}"...`);
 
   try {
     const arrayBuffer = await file.arrayBuffer();
 
     // Check magic bytes before passing to worker/indexing
     const formatCheck = detectAudioFileType(arrayBuffer, file.name);
-    if (!formatCheck.isMp3) {
+    if (!formatCheck.isSupported) {
       hideLoading();
       elements.dropzone.classList.remove('hidden');
       if (elements.fileInput) {
@@ -800,7 +800,7 @@ async function processSelectedFile(file) {
       showFormatErrorModal(
         file.name,
         formatCheck.format,
-        `File header contains <strong>${escapeHtml(formatCheck.format)}</strong> signatures rather than standard MPEG-1/2 Layer III MP3 frames. Please choose an authentic .mp3 file.`
+        `File header contains <strong>${escapeHtml(formatCheck.format)}</strong> signatures. MP3 Splitter currently supports .mp3 and .m4a audio files.`
       );
       return;
     }
@@ -813,7 +813,7 @@ async function processSelectedFile(file) {
         const workerBuffer = arrayBuffer.slice(0);
         mp3Worker.postMessage(
           {
-            action: 'indexMp3',
+            action: 'indexAudio',
             payload: { buffer: workerBuffer },
           },
           [workerBuffer]
@@ -827,16 +827,21 @@ async function processSelectedFile(file) {
     // In-thread fallback
     setTimeout(() => {
       try {
-        const indexResult = parseMp3IndexDirect(state.file.buffer, (progress) => {
-          const scaled = Math.min(50, Math.round(15 + progress * 0.35));
-          updateLoadingProgress(scaled, 'Indexing audio frames (lossless)...');
-        });
+        let indexResult;
+        if (formatCheck.isM4a) {
+          indexResult = parseM4aIndexDirect(state.file.buffer);
+        } else {
+          indexResult = parseMp3IndexDirect(state.file.buffer, (progress) => {
+            const scaled = Math.min(50, Math.round(15 + progress * 0.35));
+            updateLoadingProgress(scaled, 'Indexing audio frames (lossless)...');
+          });
+        }
         onIndexComplete(indexResult);
       } catch (err) {
         hideLoading();
         elements.dropzone.classList.remove('hidden');
         if (elements.fileInput) elements.fileInput.disabled = false;
-        showSnackbar('Error reading MP3: ' + err.message);
+        showSnackbar('Error reading audio: ' + err.message);
       }
     }, 50);
   } catch (err) {
@@ -874,8 +879,16 @@ function onIndexComplete(index) {
     elements.currentTimeDisplay.textContent = '00:00.0';
   }
 
-  // Keep cards hidden and buttons disabled until decode finishes completely
-  updateLoadingProgress(50, 'Decoding audio for waveform & silence analysis...');
+  // Fast-path: Worker already computed instant frame peaks (zero-PCM memory, zero-OOM crash on mobile)
+  if (index.peaks && index.peaks.length > 0) {
+    state.peaks = index.peaks;
+    applySmartSilenceThreshold(state.peaks);
+    updateLoadingProgress(100, 'Audio ready!');
+    finalizeProcessing();
+    return;
+  }
+
+  updateLoadingProgress(60, 'Computing waveform...');
   computePeaks();
 }
 
@@ -891,34 +904,36 @@ function detectAudioFileType(buffer, fileName = '') {
       (bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) ||
       (bytes[0] === 0x66 && bytes[1] === 0x74 && bytes[2] === 0x79 && bytes[3] === 0x70)
     ) {
-      return { isMp3: false, format: 'M4A / AAC (Apple MPEG-4 Audio)' };
+      return { isSupported: true, isMp3: false, isM4a: true, format: 'M4A' };
     }
 
     // WAV: "RIFF" ... "WAVE"
     if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) {
-      return { isMp3: false, format: 'WAV (Waveform Audio)' };
+      return { isSupported: false, isMp3: false, isM4a: false, format: 'WAV (Waveform Audio)' };
     }
 
     // FLAC: "fLaC"
     if (bytes[0] === 0x66 && bytes[1] === 0x4c && bytes[2] === 0x61 && bytes[3] === 0x43) {
-      return { isMp3: false, format: 'FLAC (Lossless Audio)' };
+      return { isSupported: false, isMp3: false, isM4a: false, format: 'FLAC (Lossless Audio)' };
     }
 
     // OGG: "OggS"
     if (bytes[0] === 0x4f && bytes[1] === 0x67 && bytes[2] === 0x67 && bytes[3] === 0x53) {
-      return { isMp3: false, format: 'OGG (Vorbis/Opus Audio)' };
+      return { isSupported: false, isMp3: false, isM4a: false, format: 'OGG (Vorbis/Opus Audio)' };
     }
 
     // WebM / Matroska
     if (bytes[0] === 0x1a && bytes[1] === 0x45 && bytes[2] === 0xdf && bytes[3] === 0xa3) {
-      return { isMp3: false, format: 'WebM / Opus Audio' };
+      return { isSupported: false, isMp3: false, isM4a: false, format: 'WebM / Opus Audio' };
     }
   }
 
   const ext = (fileName.split('.').pop() || '').toLowerCase();
+  if (ext === 'm4a') {
+    return { isSupported: true, isMp3: false, isM4a: true, format: 'M4A' };
+  }
   if (ext && ext !== 'mp3') {
     const knownFormats = {
-      m4a: 'M4A / AAC (Apple Audio)',
       aac: 'AAC Audio Stream',
       wav: 'WAV Audio',
       flac: 'FLAC Lossless Audio',
@@ -929,10 +944,10 @@ function detectAudioFileType(buffer, fileName = '') {
       m4r: 'M4R iPhone Ringtone',
       aiff: 'AIFF Audio',
     };
-    return { isMp3: false, format: knownFormats[ext] || `.${ext.toUpperCase()} Audio` };
+    return { isSupported: false, isMp3: false, isM4a: false, format: knownFormats[ext] || `.${ext.toUpperCase()} Audio` };
   }
 
-  return { isMp3: true, format: 'MP3' };
+  return { isSupported: true, isMp3: true, isM4a: false, format: 'MP3' };
 }
 
 // =============================================================================
@@ -1118,7 +1133,10 @@ function parseMp3IndexDirect(buffer, onProgress) {
   const avgBitrate = Math.round(detectedBitrateSum / frameCount);
   const isVbr = detectedBitrates.size > 1;
 
+  const peaks = computeMp3PeaksFromFrames(bytes, trimmedOffsets, trimmedOffsets.length, duration);
+
   return {
+    format: 'mp3',
     frameCount,
     audioFrameCount,
     firstAudioFrameIndex,
@@ -1130,6 +1148,7 @@ function parseMp3IndexDirect(buffer, onProgress) {
     isVbr,
     hasXingHeader,
     frameOffsets: trimmedOffsets,
+    peaks,
   };
 }
 
@@ -1185,153 +1204,457 @@ function sliceMp3Direct({ buffer, startByte, endByte, partName }) {
 }
 
 // =============================================================================
-// Waveform & Loudness Peak Computation (Accurate Web Audio Decoding)
+// In-Thread M4A (ISO-BMFF / AAC) Indexing & Slicing Engine
 // =============================================================================
+function packM4aAtom(name, payload) {
+  const buf = new Uint8Array(8 + payload.length);
+  const view = new DataView(buf.buffer);
+  view.setUint32(0, 8 + payload.length);
+  for (let i = 0; i < 4; i++) buf[4 + i] = name.charCodeAt(i);
+  buf.set(payload, 8);
+  return buf;
+}
+
+function concatM4aBuffers(...arrays) {
+  let total = 0;
+  for (const a of arrays) total += a ? a.length : 0;
+  const res = new Uint8Array(total);
+  let p = 0;
+  for (const a of arrays) {
+    if (a) {
+      res.set(a, p);
+      p += a.length;
+    }
+  }
+  return res;
+}
+
+function makeM4aMetaUdta(title) {
+  if (!title) return new Uint8Array(0);
+  const titleBytes = new TextEncoder().encode(title);
+  const dataAtom = packM4aAtom('data', concatM4aBuffers(new Uint8Array([0, 0, 0, 1, 0, 0, 0, 0]), titleBytes));
+  const namAtom = packM4aAtom('\xA9nam', dataAtom);
+  const ilstAtom = packM4aAtom('ilst', namAtom);
+  const metaPayload = concatM4aBuffers(new Uint8Array([0, 0, 0, 0]), ilstAtom);
+  const metaAtom = packM4aAtom('meta', metaPayload);
+  return packM4aAtom('udta', metaAtom);
+}
+
+function parseM4aAtoms(bytes, view, start, end) {
+  const atoms = [];
+  let pos = start;
+  while (pos + 8 <= end) {
+    let size = view.getUint32(pos);
+    let name = String.fromCharCode(bytes[pos + 4], bytes[pos + 5], bytes[pos + 6], bytes[pos + 7]);
+    let headerSize = 8;
+    if (size === 1) {
+      if (pos + 16 > end) break;
+      size = Number(view.getBigUint64(pos + 8));
+      headerSize = 16;
+    } else if (size === 0) {
+      size = end - pos;
+    }
+    if (size < headerSize || pos + size > end) break;
+    atoms.push({ name, start: pos, size, headerSize, payloadStart: pos + headerSize, payloadEnd: pos + size });
+    pos += size;
+  }
+  return atoms;
+}
+
+function parseM4aIndexDirect(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const view = new DataView(buffer);
+
+  const topAtoms = parseM4aAtoms(bytes, view, 0, bytes.length);
+  const ftyp = topAtoms.find((a) => a.name === 'ftyp');
+  const moov = topAtoms.find((a) => a.name === 'moov');
+  if (!ftyp || !moov) {
+    throw new Error('Invalid M4A: missing ftyp or moov container box.');
+  }
+
+  const moovAtoms = parseM4aAtoms(bytes, view, moov.payloadStart, moov.payloadEnd);
+  const mvhd = moovAtoms.find((a) => a.name === 'mvhd');
+  const trak = moovAtoms.find((a) => a.name === 'trak');
+  if (!trak || !mvhd) {
+    throw new Error('Invalid M4A: missing mvhd or trak box.');
+  }
+
+  const trakAtoms = parseM4aAtoms(bytes, view, trak.payloadStart, trak.payloadEnd);
+  const tkhd = trakAtoms.find((a) => a.name === 'tkhd');
+  const mdia = trakAtoms.find((a) => a.name === 'mdia');
+  if (!mdia || !tkhd) {
+    throw new Error('Invalid M4A: missing tkhd or mdia box.');
+  }
+
+  const mdiaAtoms = parseM4aAtoms(bytes, view, mdia.payloadStart, mdia.payloadEnd);
+  const mdhd = mdiaAtoms.find((a) => a.name === 'mdhd');
+  const hdlr = mdiaAtoms.find((a) => a.name === 'hdlr');
+  const minf = mdiaAtoms.find((a) => a.name === 'minf');
+  if (!mdhd || !minf || !hdlr) {
+    throw new Error('Invalid M4A: missing mdhd, hdlr, or minf box.');
+  }
+
+  const minfAtoms = parseM4aAtoms(bytes, view, minf.payloadStart, minf.payloadEnd);
+  const smhd = minfAtoms.find((a) => a.name === 'smhd');
+  const dinf = minfAtoms.find((a) => a.name === 'dinf');
+  const stbl = minfAtoms.find((a) => a.name === 'stbl');
+  if (!stbl) {
+    throw new Error('Invalid M4A: missing stbl sample table box.');
+  }
+
+  const stblAtoms = parseM4aAtoms(bytes, view, stbl.payloadStart, stbl.payloadEnd);
+  const stsd = stblAtoms.find((a) => a.name === 'stsd');
+  const stts = stblAtoms.find((a) => a.name === 'stts');
+  const stsc = stblAtoms.find((a) => a.name === 'stsc');
+  const stsz = stblAtoms.find((a) => a.name === 'stsz');
+  const stco = stblAtoms.find((a) => a.name === 'stco');
+  const co64 = stblAtoms.find((a) => a.name === 'co64');
+
+  if (!stsd || !stts || !stsc || !stsz || (!stco && !co64)) {
+    throw new Error('Invalid M4A: missing required sample table atoms.');
+  }
+
+  const mdhdVer = view.getUint8(mdhd.payloadStart);
+  let timescale, duration;
+  if (mdhdVer === 0) {
+    timescale = view.getUint32(mdhd.payloadStart + 12);
+    duration = view.getUint32(mdhd.payloadStart + 16);
+  } else {
+    timescale = view.getUint32(mdhd.payloadStart + 20);
+    duration = Number(view.getBigUint64(mdhd.payloadStart + 24));
+  }
+
+  const mvhdVer = view.getUint8(mvhd.payloadStart);
+  const mvhdTimescale = mvhdVer === 0 ? view.getUint32(mvhd.payloadStart + 12) : view.getUint32(mvhd.payloadStart + 20);
+
+  const chunkOffsets = [];
+  if (stco) {
+    const count = view.getUint32(stco.payloadStart + 4);
+    for (let i = 0; i < count; i++) {
+      chunkOffsets.push(view.getUint32(stco.payloadStart + 8 + i * 4));
+    }
+  } else {
+    const count = view.getUint32(co64.payloadStart + 4);
+    for (let i = 0; i < count; i++) {
+      chunkOffsets.push(Number(view.getBigUint64(co64.payloadStart + 8 + i * 8)));
+    }
+  }
+
+  const uniformSize = view.getUint32(stsz.payloadStart + 4);
+  const sampleCount = view.getUint32(stsz.payloadStart + 8);
+  const sampleSizes = new Uint32Array(sampleCount);
+  let totalAudioBytes = 0;
+  if (uniformSize === 0) {
+    for (let i = 0; i < sampleCount; i++) {
+      const s = view.getUint32(stsz.payloadStart + 12 + i * 4);
+      sampleSizes[i] = s;
+      totalAudioBytes += s;
+    }
+  } else {
+    sampleSizes.fill(uniformSize);
+    totalAudioBytes = uniformSize * sampleCount;
+  }
+
+  const stscCount = view.getUint32(stsc.payloadStart + 4);
+  const scEntries = [];
+  for (let i = 0; i < stscCount; i++) {
+    scEntries.push({
+      firstChunk: view.getUint32(stsc.payloadStart + 8 + i * 12),
+      samplesPerChunk: view.getUint32(stsc.payloadStart + 12 + i * 12),
+    });
+  }
+
+  const sampleOffsets = new Uint32Array(sampleCount);
+  let sIdx = 0;
+  for (let cIdx = 1; cIdx <= chunkOffsets.length; cIdx++) {
+    let currSpc = scEntries[0].samplesPerChunk;
+    for (let k = 0; k < scEntries.length; k++) {
+      if (cIdx >= scEntries[k].firstChunk) {
+        currSpc = scEntries[k].samplesPerChunk;
+      } else {
+        break;
+      }
+    }
+    let curOffset = chunkOffsets[cIdx - 1];
+    for (let s = 0; s < currSpc && sIdx < sampleCount; s++) {
+      sampleOffsets[sIdx] = curOffset;
+      curOffset += sampleSizes[sIdx];
+      sIdx++;
+    }
+  }
+
+  const durationSec = duration / timescale;
+  const frameDuration = sampleCount > 0 ? durationSec / sampleCount : 0.0232;
+  const avgBitrate = durationSec > 0 ? Math.round((totalAudioBytes * 8) / durationSec / 1000) : 128;
+
+  const rawAtoms = {
+    ftyp: bytes.slice(ftyp.start, ftyp.payloadEnd),
+    mvhd: bytes.slice(mvhd.payloadStart, mvhd.payloadEnd),
+    tkhd: bytes.slice(tkhd.payloadStart, tkhd.payloadEnd),
+    mdhd: bytes.slice(mdhd.payloadStart, mdhd.payloadEnd),
+    hdlr: bytes.slice(hdlr.payloadStart, hdlr.payloadEnd),
+    smhd: smhd ? bytes.slice(smhd.payloadStart, smhd.payloadEnd) : null,
+    dinf: dinf ? bytes.slice(dinf.payloadStart, dinf.payloadEnd) : null,
+    stsd: bytes.slice(stsd.payloadStart, stsd.payloadEnd),
+  };
+
+  const peaks = computeM4aPeaksFromSamples(sampleSizes, durationSec);
+
+  return {
+    format: 'm4a',
+    frameCount: sampleCount,
+    audioFrameCount: sampleCount,
+    firstAudioFrameIndex: 0,
+    sampleRate: timescale,
+    frameDuration,
+    duration: durationSec,
+    bitrate: avgBitrate,
+    isVbr: true,
+    sampleOffsets,
+    sampleSizes,
+    frameOffsets: sampleOffsets,
+    timescale,
+    mvhdTimescale,
+    rawAtoms,
+    peaks,
+  };
+}
+
+function sliceM4aDirect({ buffer, sampleSizes, timescale, mvhdTimescale, rawAtoms, partName }) {
+  const audioBytes = new Uint8Array(buffer);
+  const numSamples = sampleSizes.length;
+
+  const stszPayload = new Uint8Array(12 + numSamples * 4);
+  const stszView = new DataView(stszPayload.buffer);
+  stszView.setUint32(0, 0);
+  stszView.setUint32(4, 0);
+  stszView.setUint32(8, numSamples);
+  for (let i = 0; i < numSamples; i++) {
+    stszView.setUint32(12 + i * 4, sampleSizes[i]);
+  }
+  const newStsz = packM4aAtom('stsz', stszPayload);
+
+  const sttsPayload = new Uint8Array(16);
+  const sttsView = new DataView(sttsPayload.buffer);
+  sttsView.setUint32(0, 0);
+  sttsView.setUint32(4, 1);
+  sttsView.setUint32(8, numSamples);
+  sttsView.setUint32(12, 1024);
+  const newStts = packM4aAtom('stts', sttsPayload);
+
+  const stscPayload = new Uint8Array(20);
+  const stscView = new DataView(stscPayload.buffer);
+  stscView.setUint32(0, 0);
+  stscView.setUint32(4, 1);
+  stscView.setUint32(8, 1);
+  stscView.setUint32(12, numSamples);
+  stscView.setUint32(16, 1);
+  const newStsc = packM4aAtom('stsc', stscPayload);
+
+  const newAudioDuration = numSamples * 1024;
+  const mdhdPayload = new Uint8Array(rawAtoms.mdhd);
+  const mdhdView = new DataView(mdhdPayload.buffer, mdhdPayload.byteOffset, mdhdPayload.byteLength);
+  if (mdhdView.getUint8(0) === 0) {
+    mdhdView.setUint32(16, newAudioDuration);
+  } else {
+    mdhdView.setBigUint64(24, BigInt(newAudioDuration));
+  }
+  const newMdhd = packM4aAtom('mdhd', mdhdPayload);
+
+  const newMvhdDuration = Math.round((newAudioDuration * mvhdTimescale) / timescale);
+  const mvhdPayload = new Uint8Array(rawAtoms.mvhd);
+  const mvhdView = new DataView(mvhdPayload.buffer, mvhdPayload.byteOffset, mvhdPayload.byteLength);
+  if (mvhdView.getUint8(0) === 0) {
+    mvhdView.setUint32(16, newMvhdDuration);
+  } else {
+    mvhdView.setBigUint64(24, BigInt(newMvhdDuration));
+  }
+  const newMvhd = packM4aAtom('mvhd', mvhdPayload);
+
+  const tkhdPayload = new Uint8Array(rawAtoms.tkhd);
+  const tkhdView = new DataView(tkhdPayload.buffer, tkhdPayload.byteOffset, tkhdPayload.byteLength);
+  if (tkhdView.getUint8(0) === 0) {
+    tkhdView.setUint32(20, newMvhdDuration);
+  } else {
+    tkhdView.setBigUint64(28, BigInt(newMvhdDuration));
+  }
+  const newTkhd = packM4aAtom('tkhd', tkhdPayload);
+
+  const udtaBytes = makeM4aMetaUdta(partName);
+
+  function assembleMoov(mdatOffset) {
+    const stcoPayload = new Uint8Array(12);
+    const stcoView = new DataView(stcoPayload.buffer);
+    stcoView.setUint32(0, 0);
+    stcoView.setUint32(4, 1);
+    stcoView.setUint32(8, mdatOffset);
+    const newStco = packM4aAtom('stco', stcoPayload);
+
+    const stblPayload = concatM4aBuffers(packM4aAtom('stsd', rawAtoms.stsd), newStts, newStsc, newStsz, newStco);
+    const newStbl = packM4aAtom('stbl', stblPayload);
+    const minfPayload = concatM4aBuffers(
+      rawAtoms.smhd ? packM4aAtom('smhd', rawAtoms.smhd) : new Uint8Array(0),
+      rawAtoms.dinf ? packM4aAtom('dinf', rawAtoms.dinf) : new Uint8Array(0),
+      newStbl
+    );
+    const newMinf = packM4aAtom('minf', minfPayload);
+    const mdiaPayload = concatM4aBuffers(newMdhd, packM4aAtom('hdlr', rawAtoms.hdlr), newMinf);
+    const newMdia = packM4aAtom('mdia', mdiaPayload);
+    const trakPayload = concatM4aBuffers(newTkhd, newMdia);
+    const newTrak = packM4aAtom('trak', trakPayload);
+    const moovPayload = concatM4aBuffers(newMvhd, newTrak, udtaBytes);
+    return packM4aAtom('moov', moovPayload);
+  }
+
+  const ftypBytes = rawAtoms.ftyp;
+  const dummyMoov = assembleMoov(0);
+  const mdatDataOffset = ftypBytes.length + dummyMoov.length + 8;
+  const finalMoov = assembleMoov(mdatDataOffset);
+
+  const newMdat = packM4aAtom('mdat', audioBytes);
+  const output = concatM4aBuffers(ftypBytes, finalMoov, newMdat);
+  return output.buffer;
+}
+
+// =============================================================================
+// Waveform & Loudness Peak Computation (Instant, Zero-PCM Memory, Zero-OOM)
+// =============================================================================
+function computeMp3PeaksFromFrames(bytes, frameOffsets, frameCount, duration) {
+  const windowSec = 0.05; // 50ms standard resolution
+  const totalWindows = Math.max(1, Math.ceil(duration / windowSec));
+  const peaks = new Float32Array(totalWindows);
+  peaks.fill(-60);
+
+  if (!frameCount || frameCount === 0 || !frameOffsets || frameOffsets.length === 0) return peaks;
+
+  const frameDuration = duration / frameCount;
+
+  for (let i = 0; i < frameCount; i++) {
+    const offset = frameOffsets[i];
+    if (offset + 10 > bytes.length) continue;
+
+    const b1 = bytes[offset + 1];
+    const b3 = bytes[offset + 3];
+
+    const protection = b1 & 0x01;
+    const channelMode = (b3 >> 6) & 0x03;
+
+    let gain = 0;
+    const headerLen = 4 + (protection === 0 ? 2 : 0);
+    const sideInfoOffset = offset + headerLen;
+
+    if (sideInfoOffset + 8 <= bytes.length) {
+      if (channelMode === 3) {
+        // Mono MP3
+        const b4 = bytes[sideInfoOffset + 4];
+        const b5 = bytes[sideInfoOffset + 5];
+        gain = ((b4 & 0x01) << 7) | ((b5 >> 1) & 0x7f);
+      } else {
+        // Stereo MP3
+        const b5 = bytes[sideInfoOffset + 5];
+        const b6 = bytes[sideInfoOffset + 6];
+        gain = ((b5 & 0x7f) << 1) | ((b6 >> 7) & 1);
+      }
+    }
+
+    let db = -60;
+    if (gain > 0) {
+      // MPEG-1 Layer 3 logarithmic gain mapping: 2^(0.25*(gain-210)) -> 1.505*(gain-210) dB
+      db = Math.max(-60, Math.min(0, (gain - 210) * 0.75 - 3));
+    }
+
+    const t = i * frameDuration;
+    const w = Math.floor(t / windowSec);
+    if (w < totalWindows) {
+      if (db > peaks[w]) {
+        peaks[w] = db;
+      }
+    }
+  }
+
+  return peaks;
+}
+
+function computeM4aPeaksFromSamples(sampleSizes, duration) {
+  const windowSec = 0.05;
+  const totalWindows = Math.max(1, Math.ceil(duration / windowSec));
+  const peaks = new Float32Array(totalWindows);
+  peaks.fill(-60);
+
+  const sampleCount = sampleSizes ? sampleSizes.length : 0;
+  if (sampleCount === 0) return peaks;
+
+  let maxS = 1;
+  for (let i = 0; i < sampleCount; i++) {
+    if (sampleSizes[i] > maxS) maxS = sampleSizes[i];
+  }
+  const minThreshold = 25;
+  const range = Math.max(1, maxS - minThreshold);
+  const sampleDuration = duration / sampleCount;
+
+  for (let i = 0; i < sampleCount; i++) {
+    const s = sampleSizes[i];
+    let db = -60;
+    if (s > minThreshold) {
+      const norm = Math.min(1.0, (s - minThreshold) / range);
+      db = Math.max(-60, Math.min(0, -60 + 60 * Math.sqrt(norm)));
+    }
+
+    const t = i * sampleDuration;
+    const w = Math.floor(t / windowSec);
+    if (w < totalWindows) {
+      if (db > peaks[w]) {
+        peaks[w] = db;
+      }
+    }
+  }
+
+  return peaks;
+}
+
+function applySmartSilenceThreshold(peaks) {
+  const validPeaks = [];
+  for (let i = 0; i < peaks.length; i++) {
+    if (peaks[i] > -58) validPeaks.push(peaks[i]);
+  }
+
+  if (validPeaks.length > 50) {
+    validPeaks.sort((a, b) => a - b);
+    const p10 = validPeaks[Math.floor(validPeaks.length * 0.10)];
+    const p90 = validPeaks[Math.floor(validPeaks.length * 0.90)];
+
+    // Keep smart threshold within realistic inter-track gap range (-42 dB to -32 dB)
+    if (p90 - p10 >= 8) {
+      const smartThreshold = Math.min(-32, Math.max(-42, Math.round(p10 + 6)));
+      state.settings.silenceDb = smartThreshold;
+      if (elements.inputSilenceDb) {
+        elements.inputSilenceDb.value = smartThreshold;
+        elements.valSilenceDb.textContent = `${smartThreshold} dB`;
+      }
+    }
+  }
+}
+
 async function computePeaks() {
   if (!state.file || !state.file.buffer || !state.index) return;
 
   try {
-    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContextClass) {
-      finishPeaksFallback();
-      return;
-    }
-
-    if (!sharedAudioContext) {
-      sharedAudioContext = new AudioContextClass();
-    }
-
-    const duration = state.index.duration;
-    const windowSec = 0.05; // 50 ms window
-    const totalWindows = Math.max(1, Math.ceil(duration / windowSec));
-    const peaks = new Float32Array(totalWindows);
-    peaks.fill(-60);
-
-    updateLoadingProgress(60, 'Decoding audio for waveform & silence analysis...');
-
-    // Attempt full buffer decode for 100% accurate PCM data and bit-reservoir continuity
-    let fullAudioBuffer = null;
-    try {
-      fullAudioBuffer = await decodeAudioDataAsync(sharedAudioContext, state.file.buffer.slice(0));
-    } catch (fullErr) {
-      console.warn('Full buffer decode failed, attempting chunked decode fallback:', fullErr);
-    }
-
-    if (fullAudioBuffer) {
-      const numChannels = fullAudioBuffer.numberOfChannels;
-      const ch0 = fullAudioBuffer.getChannelData(0);
-      const ch1 = numChannels > 1 ? fullAudioBuffer.getChannelData(1) : null;
-      const sampleRate = fullAudioBuffer.sampleRate;
-      const windowSizeSamples = Math.floor(sampleRate * windowSec);
-
-      for (let w = 0; w < totalWindows; w++) {
-        const startSample = w * windowSizeSamples;
-        const endSample = Math.min(ch0.length, (w + 1) * windowSizeSamples);
-
-        if (startSample >= ch0.length) {
-          peaks[w] = -60;
-          continue;
-        }
-
-        let sumSquares = 0;
-        const count = Math.max(1, endSample - startSample);
-        if (ch1) {
-          for (let s = startSample; s < endSample; s++) {
-            sumSquares += ch0[s] * ch0[s] + ch1[s] * ch1[s];
-          }
-          const rms = Math.sqrt(sumSquares / (count * 2));
-          peaks[w] = Math.max(-60, 20 * Math.log10(rms + 1e-6));
-        } else {
-          for (let s = startSample; s < endSample; s++) {
-            sumSquares += ch0[s] * ch0[s];
-          }
-          const rms = Math.sqrt(sumSquares / count);
-          peaks[w] = Math.max(-60, 20 * Math.log10(rms + 1e-6));
-        }
-      }
-
-      // Memory cleanup: release audio buffer reference immediately
-      fullAudioBuffer = null;
+    let peaks;
+    if (state.index.peaks && state.index.peaks.length > 0) {
+      peaks = state.index.peaks;
+    } else if (state.index.format === 'm4a') {
+      peaks = computeM4aPeaksFromSamples(state.index.sampleSizes, state.index.duration);
     } else {
-      // Chunk-based fallback for very constrained devices
-      const chunkDuration = 30;
-      const totalChunks = Math.ceil(duration / chunkDuration);
-      const frameOffsets = state.index.frameOffsets;
-      const frameDuration = state.index.frameDuration;
-
-      for (let c = 0; c < totalChunks; c++) {
-        const chunkStartSec = c * chunkDuration;
-        const chunkEndSec = Math.min(duration, (c + 1) * chunkDuration);
-
-        const startFrame = Math.floor(chunkStartSec / frameDuration);
-        const endFrame = Math.min(frameOffsets.length, Math.ceil(chunkEndSec / frameDuration));
-
-        if (startFrame >= frameOffsets.length) break;
-
-        const startByte = frameOffsets[startFrame];
-        const endByte = endFrame < frameOffsets.length ? frameOffsets[endFrame] : state.file.buffer.byteLength;
-
-        if (endByte <= startByte) continue;
-
-        try {
-          const chunkBuffer = state.file.buffer.slice(startByte, endByte);
-          const chunkAudio = await decodeAudioDataAsync(sharedAudioContext, chunkBuffer);
-          const channelData = chunkAudio.getChannelData(0);
-          const sampleRate = chunkAudio.sampleRate;
-          const windowSizeSamples = Math.floor(sampleRate * windowSec);
-
-          const chunkStartWindow = Math.floor(chunkStartSec / windowSec);
-          const chunkWindows = Math.floor(chunkAudio.duration / windowSec);
-
-          for (let w = 0; w < chunkWindows; w++) {
-            const globalIdx = chunkStartWindow + w;
-            if (globalIdx >= totalWindows) break;
-
-            const startSample = w * windowSizeSamples;
-            const endSample = Math.min(channelData.length, (w + 1) * windowSizeSamples);
-
-            let sumSquares = 0;
-            for (let s = startSample; s < endSample; s++) {
-              sumSquares += channelData[s] * channelData[s];
-            }
-
-            const count = Math.max(1, endSample - startSample);
-            const rms = Math.sqrt(sumSquares / count);
-            peaks[globalIdx] = Math.max(-60, 20 * Math.log10(rms + 1e-6));
-          }
-        } catch (chunkErr) {
-          console.warn(`Chunk ${c} decode warning:`, chunkErr);
-        }
-      }
-    }
-
-    // Auto-tune silence threshold based on noise floor analysis
-    const validPeaks = [];
-    for (let i = 0; i < peaks.length; i++) {
-      if (peaks[i] > -58) validPeaks.push(peaks[i]);
-    }
-
-    if (validPeaks.length > 50) {
-      validPeaks.sort((a, b) => a - b);
-      const p10 = validPeaks[Math.floor(validPeaks.length * 0.10)];
-      const p90 = validPeaks[Math.floor(validPeaks.length * 0.90)];
-
-      // Keep smart threshold within realistic inter-track gap range (-42 dB to -32 dB)
-      if (p90 - p10 >= 8) {
-        const smartThreshold = Math.min(-32, Math.max(-42, Math.round(p10 + 6)));
-        state.settings.silenceDb = smartThreshold;
-        if (elements.inputSilenceDb) {
-          elements.inputSilenceDb.value = smartThreshold;
-          elements.valSilenceDb.textContent = `${smartThreshold} dB`;
-        }
-      }
+      const bytes = new Uint8Array(state.file.buffer);
+      peaks = computeMp3PeaksFromFrames(bytes, state.index.frameOffsets, state.index.frameCount, state.index.duration);
     }
 
     state.peaks = peaks;
+    applySmartSilenceThreshold(peaks);
     updateLoadingProgress(100, 'Audio ready!');
     finalizeProcessing();
   } catch (err) {
-    console.warn('Loudness peak computation failed, using synthetic envelope:', err);
+    console.warn('Loudness peak computation fallback:', err);
     finishPeaksFallback();
   }
 }
@@ -2385,7 +2708,8 @@ function togglePlayWholeFile() {
     elements.pauseIcon.classList.add('hidden');
   } else {
     if (state.ui.previewId !== 'whole') {
-      const blob = new Blob([state.file.buffer], { type: 'audio/mpeg' });
+      const mimeType = state.index && state.index.format === 'm4a' ? 'audio/mp4' : 'audio/mpeg';
+      const blob = new Blob([state.file.buffer], { type: mimeType });
       const url = URL.createObjectURL(blob);
       elements.previewAudio.src = url;
       state.ui.previewId = 'whole';
@@ -2408,18 +2732,45 @@ function playAudioRange(startSec, endSec, partId = null) {
 
   stopPreview();
 
+  const isM4a = state.index.format === 'm4a';
   const frameDuration = state.index.frameDuration;
   const frameOffsets = state.index.frameOffsets;
-  const firstAudioFrameIndex = state.index.firstAudioFrameIndex || 0;
+  let blob;
 
-  const startFrame = Math.max(firstAudioFrameIndex, firstAudioFrameIndex + Math.floor(startSec / frameDuration));
-  const endFrame = Math.min(frameOffsets.length, firstAudioFrameIndex + Math.ceil(endSec / frameDuration));
+  if (isM4a) {
+    const sampleSizes = state.index.sampleSizes;
+    const totalSamples = frameOffsets.length;
+    const startFrame = Math.max(0, Math.min(totalSamples - 1, Math.floor(startSec / frameDuration)));
+    const endFrame = Math.max(startFrame + 1, Math.min(totalSamples, Math.ceil(endSec / frameDuration)));
 
-  const startByte = frameOffsets[startFrame] || 0;
-  const endByte = endFrame < frameOffsets.length ? frameOffsets[endFrame] : state.file.buffer.byteLength;
+    const startByte = frameOffsets[startFrame];
+    const lastFrame = endFrame - 1;
+    const endByte = frameOffsets[lastFrame] + sampleSizes[lastFrame];
 
-  const slice = state.file.buffer.slice(startByte, endByte);
-  const blob = new Blob([slice], { type: 'audio/mpeg' });
+    const slicedSampleSizes = sampleSizes.slice(startFrame, endFrame);
+    const sliceAudioBuffer = state.file.buffer.slice(startByte, endByte);
+
+    const m4aBytes = sliceM4aDirect({
+      buffer: sliceAudioBuffer,
+      sampleSizes: slicedSampleSizes,
+      timescale: state.index.timescale,
+      mvhdTimescale: state.index.mvhdTimescale,
+      rawAtoms: state.index.rawAtoms,
+      partName: 'Preview',
+    });
+    blob = new Blob([m4aBytes], { type: 'audio/mp4' });
+  } else {
+    const firstAudioFrameIndex = state.index.firstAudioFrameIndex || 0;
+    const startFrame = Math.max(firstAudioFrameIndex, firstAudioFrameIndex + Math.floor(startSec / frameDuration));
+    const endFrame = Math.min(frameOffsets.length, firstAudioFrameIndex + Math.ceil(endSec / frameDuration));
+
+    const startByte = frameOffsets[startFrame] || 0;
+    const endByte = endFrame < frameOffsets.length ? frameOffsets[endFrame] : state.file.buffer.byteLength;
+
+    const slice = state.file.buffer.slice(startByte, endByte);
+    blob = new Blob([slice], { type: 'audio/mpeg' });
+  }
+
   const url = URL.createObjectURL(blob);
 
   if (state.ui.previewBlobUrl) {
@@ -2471,7 +2822,7 @@ function stopPreview() {
 }
 
 // =============================================================================
-// Lossless MP3 Slicing & Screen Wake Lock
+// Lossless Audio Slicing & Screen Wake Lock (MP3 & M4A)
 // =============================================================================
 async function splitPart(part) {
   if (part.status === 'working') return;
@@ -2482,6 +2833,71 @@ async function splitPart(part) {
   renderParts();
 
   try {
+    const isM4a = state.index && state.index.format === 'm4a';
+
+    if (isM4a) {
+      const frameOffsets = state.index.frameOffsets;
+      const sampleSizes = state.index.sampleSizes;
+      const frameDuration = state.index.frameDuration;
+      const totalSamples = frameOffsets.length;
+
+      const startFrame = Math.max(0, Math.min(totalSamples - 1, Math.floor(part.start / frameDuration)));
+      const endFrame = Math.max(startFrame + 1, Math.min(totalSamples, Math.ceil(part.end / frameDuration)));
+
+      const startByte = frameOffsets[startFrame];
+      const lastFrame = endFrame - 1;
+      const endByte = frameOffsets[lastFrame] + sampleSizes[lastFrame];
+
+      const slicedSampleSizes = sampleSizes.slice(startFrame, endFrame);
+      const sliceBuffer = state.file.buffer.slice(startByte, endByte);
+
+      if (mp3Worker) {
+        try {
+          mp3Worker.postMessage(
+            {
+              action: 'sliceAudio',
+              payload: {
+                format: 'm4a',
+                buffer: sliceBuffer,
+                sampleSizes: slicedSampleSizes,
+                timescale: state.index.timescale,
+                mvhdTimescale: state.index.mvhdTimescale,
+                rawAtoms: state.index.rawAtoms,
+                partName: part.name,
+                id: part.id,
+              },
+            },
+            [sliceBuffer]
+          );
+          return;
+        } catch (e) {
+          console.warn('Worker slice postMessage failed, falling back to in-thread:', e);
+        }
+      }
+
+      // In-thread M4A slicing fallback
+      setTimeout(() => {
+        try {
+          const slicedBuffer = sliceM4aDirect({
+            buffer: sliceBuffer,
+            sampleSizes: slicedSampleSizes,
+            timescale: state.index.timescale,
+            mvhdTimescale: state.index.mvhdTimescale,
+            rawAtoms: state.index.rawAtoms,
+            partName: part.name,
+          });
+          onSliceComplete(part.id, part.name, slicedBuffer);
+        } catch (err) {
+          part.status = 'error';
+          releaseWakeLock();
+          renderParts();
+          showSnackbar('Failed to split part: ' + err.message);
+        }
+      }, 20);
+      return;
+    }
+
+    // Standard MP3 frame slicing
     const frameOffsets = state.index.frameOffsets;
     const frameDuration = state.index.frameDuration;
     const firstAudioFrameIndex = state.index.firstAudioFrameIndex || 0;
@@ -2546,26 +2962,30 @@ function onSliceComplete(id, partName, arrayBuffer) {
   const part = state.parts.find((p) => p.id === id);
   if (!part) return;
 
-  const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
+  const isM4a = state.index && state.index.format === 'm4a';
+  const mimeType = isM4a ? 'audio/mp4' : 'audio/mpeg';
+  const ext = isM4a ? 'm4a' : 'mp3';
+
+  const blob = new Blob([arrayBuffer], { type: mimeType });
   part.lastBlob = blob;
   part.status = 'done';
   renderParts();
 
-  const fileName = `${sanitizeFileName(partName)}.mp3`;
-  downloadBlob(blob, fileName);
+  const fileName = `${sanitizeFileName(partName)}.${ext}`;
+  downloadBlob(blob, fileName, mimeType);
 }
 
 // =============================================================================
 // Download & Web Share Fallback (Cross-Platform Mobile & Desktop)
 // =============================================================================
-async function downloadBlob(blob, fileName) {
+async function downloadBlob(blob, fileName, mimeType = 'audio/mpeg') {
   const isIOS =
     /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
   if (isIOS && navigator.canShare) {
     try {
-      const file = new File([blob], fileName, { type: 'audio/mpeg' });
+      const file = new File([blob], fileName, { type: mimeType });
       if (navigator.canShare({ files: [file] })) {
         await navigator.share({
           files: [file],
@@ -2648,6 +3068,9 @@ function openFileInfoDialog() {
   const index = state.index;
   const file = state.file;
 
+  if (elements.fileInfoDialogTitle) {
+    elements.fileInfoDialogTitle.textContent = index.format === 'm4a' ? 'M4A / AAC File Details' : 'MP3 File Details';
+  }
   if (elements.infoModalFileName) {
     elements.infoModalFileName.textContent = file.name;
     elements.infoModalFileName.title = file.name;
@@ -2693,10 +3116,10 @@ function showFormatErrorModal(fileName, formatName, details = null) {
       </div>
     </div>
     <div style="font-size: 0.875rem; color: var(--md-sys-color-on-surface); line-height: 1.5; margin-bottom: 12px;">
-      File <strong style="color: #ffffff; word-break: break-all;">"${escapeHtml(safeFileName)}"</strong> is not an MP3 audio file.
+      File <strong style="color: #ffffff; word-break: break-all;">"${escapeHtml(safeFileName)}"</strong> is not a supported audio file.
     </div>
     <div style="font-size: 0.8125rem; color: var(--md-sys-color-on-surface-variant); line-height: 1.5;">
-      ${details ? escapeHtml(details) : 'MP3 Splitter only processes standard MP3 (.mp3) files. Please convert this audio file to .mp3 and load it again.'}
+      ${details ? escapeHtml(details) : 'MP3 Splitter currently supports standard MP3 (.mp3) and M4A/AAC (.m4a) files. Please choose a compatible audio file and load it again.'}
     </div>
   `;
 
