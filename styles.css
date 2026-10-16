@@ -99,6 +99,8 @@ html {
   -webkit-text-size-adjust: 100%;
   -webkit-tap-highlight-color: transparent;
   scroll-behavior: smooth;
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 body {
@@ -110,6 +112,8 @@ body {
   line-height: 1.5;
   padding-left: var(--safe-left);
   padding-right: var(--safe-right);
+  max-width: 100vw;
+  overflow-x: hidden;
 }
 
 /* Tabular numbers for all time and metrics */
@@ -568,6 +572,9 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .waveform-header {
@@ -575,6 +582,8 @@ body {
   align-items: center;
   justify-content: space-between;
   padding-bottom: 4px;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .time-row {
@@ -587,6 +596,7 @@ body {
   border-radius: var(--radius-xs);
   border: 1px solid var(--md-sys-color-outline-variant);
   box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+  flex-shrink: 0;
 }
 
 .current-time {
@@ -604,13 +614,16 @@ body {
 .canvas-wrapper {
   position: relative;
   width: 100%;
-  height: 128px;
+  max-width: 100%;
+  box-sizing: border-box;
+  height: 124px;
   background-color: var(--waveform-bg);
   border-radius: var(--radius-sm);
   overflow: hidden;
   cursor: pointer;
   border: 1px solid var(--md-sys-color-outline);
   box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.7);
+  touch-action: none;
 }
 
 #waveformCanvas {
@@ -1003,8 +1016,57 @@ body {
   background-color: var(--md-sys-color-surface);
 }
 
-/* Mobile Bottom Sheet conversion on screens < 600px */
+/* Mobile Responsive Layout & Bottom Sheet conversion on screens < 600px */
 @media (max-width: 599px) {
+  .main-content {
+    padding: 12px 10px;
+    gap: 12px;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .card {
+    padding: 12px 10px;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .waveform-container {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+  }
+
+  .waveform-header {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    margin-bottom: 2px;
+  }
+
+  .time-row {
+    padding: 3px 8px;
+    font-size: 0.8125rem;
+    gap: 6px;
+  }
+
+  .time-row .btn-icon {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    min-height: 36px;
+  }
+
+  .canvas-wrapper {
+    height: 106px;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
   .dialog-backdrop {
     align-items: flex-end;
     padding: 0;

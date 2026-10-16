@@ -201,7 +201,7 @@ function initElements() {
 function initWorker() {
   try {
     if (window.Worker && window.location.protocol !== 'file:') {
-      mp3Worker = new Worker('./mp3-worker.js?v=25');
+      mp3Worker = new Worker('./mp3-worker.js?v=26');
       mp3Worker.onmessage = handleWorkerMessage;
       mp3Worker.onerror = (err) => {
         console.warn('Worker error, switching to in-thread processing:', err);
@@ -1196,7 +1196,9 @@ function finalizeProcessing() {
   enableActionButtons();
   if (elements.fileInput) elements.fileInput.disabled = false;
 
-  drawWaveform();
+  requestAnimationFrame(() => {
+    drawWaveform();
+  });
   showSnackbar(`Ready to split "${state.file.name}"!`);
 }
 
@@ -1209,6 +1211,23 @@ function initCanvasResize() {
       drawWaveform();
     }
   });
+
+  window.addEventListener('orientationchange', () => {
+    setTimeout(() => {
+      if (state.index) drawWaveform();
+    }, 150);
+  });
+
+  if (window.ResizeObserver && elements.canvasWrapper) {
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentRect.width > 0 && state.index) {
+          drawWaveform();
+        }
+      }
+    });
+    ro.observe(elements.canvasWrapper);
+  }
 }
 
 function drawWaveform() {
@@ -1216,16 +1235,20 @@ function drawWaveform() {
   if (!canvas || !state.index || !elements.canvasWrapper) return;
 
   const rect = elements.canvasWrapper.getBoundingClientRect();
-  const dpr = window.devicePixelRatio || 1;
+  if (rect.width <= 0 || rect.height <= 0) return;
 
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
+  const dpr = window.devicePixelRatio || 1;
+  const w = rect.width;
+  const h = rect.height;
+
+  // Lock canvas style dimensions to container width & height to avoid browser scaling distortion
+  canvas.style.width = `${w}px`;
+  canvas.style.height = `${h}px`;
+  canvas.width = Math.round(w * dpr);
+  canvas.height = Math.round(h * dpr);
 
   const ctx = canvas.getContext('2d');
   ctx.scale(dpr, dpr);
-
-  const w = rect.width;
-  const h = rect.height;
 
   ctx.clearRect(0, 0, w, h);
 
@@ -1233,10 +1256,15 @@ function drawWaveform() {
   if (!peaks || peaks.length === 0) return;
 
   const totalWindows = peaks.length;
-  const barWidth = 3;
-  const gap = 1;
-  const step = barWidth + gap;
-  const numBars = Math.floor(w / step);
+
+  // Adaptive bar density for mobile vs desktop: ensures full span from 0 to 100% width
+  const isMobile = w < 500;
+  const targetBarWidth = isMobile ? 2.5 : 3.0;
+  const targetGap = isMobile ? 1.0 : 1.2;
+  const approxStep = targetBarWidth + targetGap;
+  const numBars = Math.max(24, Math.floor(w / approxStep));
+  const actualStep = w / numBars;
+  const barWidth = Math.max(1.5, actualStep - targetGap);
 
   const centerY = h / 2;
   const maxBarHeight = (h - 16) / 2;
@@ -1250,11 +1278,10 @@ function drawWaveform() {
   ctx.stroke();
 
   // WavePad electric green waveform
-  const barColor = '#00E676';
-  ctx.fillStyle = barColor;
+  ctx.fillStyle = '#00E676';
 
   for (let b = 0; b < numBars; b++) {
-    const x = b * step;
+    const x = b * actualStep;
     const windowIdx = Math.floor((b / numBars) * totalWindows);
     const db = peaks[windowIdx] !== undefined ? peaks[windowIdx] : -60;
 
@@ -1262,19 +1289,20 @@ function drawWaveform() {
     const barHeight = norm * maxBarHeight;
 
     ctx.beginPath();
-    ctx.roundRect(x, centerY - barHeight, barWidth, barHeight * 2, 2);
+    ctx.roundRect(x, centerY - barHeight, barWidth, barHeight * 2, isMobile ? 1 : 2);
     ctx.fill();
   }
 
+  // Draw defined parts regions
   state.parts.forEach((part, index) => {
     const startX = (part.start / state.index.duration) * w;
     const endX = (part.end / state.index.duration) * w;
     const partWidth = Math.max(2, endX - startX);
 
-    ctx.fillStyle = 'rgba(0, 230, 118, 0.12)';
+    ctx.fillStyle = 'rgba(0, 230, 118, 0.14)';
     ctx.fillRect(startX, 0, partWidth, h);
 
-    ctx.strokeStyle = 'rgba(0, 230, 118, 0.55)';
+    ctx.strokeStyle = 'rgba(0, 230, 118, 0.65)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(startX, 0);
@@ -1283,9 +1311,11 @@ function drawWaveform() {
     ctx.lineTo(endX, h);
     ctx.stroke();
 
-    ctx.fillStyle = '#00E676';
-    ctx.font = '600 10px Inter, -apple-system, sans-serif';
-    ctx.fillText(`#${index + 1} ${part.name}`, startX + 4, 14);
+    if (partWidth > 28) {
+      ctx.fillStyle = '#00E676';
+      ctx.font = '600 10px Inter, -apple-system, sans-serif';
+      ctx.fillText(`#${index + 1} ${part.name}`, startX + 4, 14);
+    }
   });
 
   // Draw suggested cut lines on waveform when Auto Split dialog is open
@@ -1305,7 +1335,7 @@ function drawWaveform() {
 
       ctx.fillStyle = '#FF5252';
       ctx.font = '600 9px Inter, -apple-system, sans-serif';
-      ctx.fillText(`✂ ${formatTime(cutSec)}`, Math.min(w - 48, x + 3), 28);
+      ctx.fillText(`✂ ${formatTime(cutSec)}`, Math.min(w - 44, Math.max(2, x + 3)), 26);
     }
     ctx.setLineDash([]);
   }
@@ -1315,24 +1345,33 @@ function initWaveformEvents() {
   const wrapper = elements.canvasWrapper;
   if (!wrapper) return;
 
-  wrapper.addEventListener('mousemove', (e) => {
+  function updateHover(x) {
     if (!state.index) return;
     const rect = wrapper.getBoundingClientRect();
-    const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
-    const ratio = x / rect.width;
+    const clampedX = Math.max(0, Math.min(rect.width, x));
+    const ratio = clampedX / rect.width;
     const hoverTime = ratio * state.index.duration;
 
     elements.waveformHoverBar.style.display = 'block';
-    elements.waveformHoverBar.style.left = `${x}px`;
+    elements.waveformHoverBar.style.left = `${clampedX}px`;
 
     elements.waveformHoverLabel.style.display = 'block';
-    elements.waveformHoverLabel.style.left = `${x}px`;
+    elements.waveformHoverLabel.style.left = `${clampedX}px`;
     elements.waveformHoverLabel.textContent = formatTime(hoverTime);
+  }
+
+  function hideHover() {
+    elements.waveformHoverBar.style.display = 'none';
+    elements.waveformHoverLabel.style.display = 'none';
+  }
+
+  wrapper.addEventListener('mousemove', (e) => {
+    const rect = wrapper.getBoundingClientRect();
+    updateHover(e.clientX - rect.left);
   });
 
   wrapper.addEventListener('mouseleave', () => {
-    elements.waveformHoverBar.style.display = 'none';
-    elements.waveformHoverLabel.style.display = 'none';
+    hideHover();
   });
 
   wrapper.addEventListener('click', (e) => {
@@ -1340,8 +1379,44 @@ function initWaveformEvents() {
     const rect = wrapper.getBoundingClientRect();
     const x = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
     const seekTime = (x / rect.width) * state.index.duration;
-
     seekToTime(seekTime);
+  });
+
+  // Touch Support for mobile touch-to-seek and drag-to-seek
+  let isTouchingWaveform = false;
+
+  function handleTouchSeek(e) {
+    if (!state.index || !e.touches || e.touches.length === 0) return;
+    const touch = e.touches[0];
+    const rect = wrapper.getBoundingClientRect();
+    const x = Math.max(0, Math.min(rect.width, touch.clientX - rect.left));
+    const seekTime = (x / rect.width) * state.index.duration;
+
+    updateHover(x);
+    seekToTime(seekTime);
+  }
+
+  wrapper.addEventListener('touchstart', (e) => {
+    isTouchingWaveform = true;
+    handleTouchSeek(e);
+  }, { passive: true });
+
+  wrapper.addEventListener('touchmove', (e) => {
+    if (isTouchingWaveform) {
+      handleTouchSeek(e);
+    }
+  }, { passive: true });
+
+  wrapper.addEventListener('touchend', () => {
+    isTouchingWaveform = false;
+    setTimeout(() => {
+      hideHover();
+    }, 1200);
+  });
+
+  wrapper.addEventListener('touchcancel', () => {
+    isTouchingWaveform = false;
+    hideHover();
   });
 }
 
