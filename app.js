@@ -311,10 +311,7 @@ function initServiceWorker() {
           if (newWorker) {
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                showSnackbar('New version available — Reload to update', 'Reload', () => {
-                  newWorker.postMessage({ action: 'skipWaiting' });
-                  window.location.reload();
-                });
+                newWorker.postMessage({ action: 'skipWaiting' });
               } else if (newWorker.state === 'activated') {
                 if (elements.offlineChip) elements.offlineChip.classList.remove('hidden');
               }
@@ -356,7 +353,6 @@ function initServiceWorker() {
   window.addEventListener('appinstalled', () => {
     state.deferredInstallPrompt = null;
     if (elements.btnInstall) elements.btnInstall.classList.add('hidden');
-    showSnackbar('MP3 Splitter installed successfully!');
   });
 }
 
@@ -460,6 +456,23 @@ function initEvents() {
       }
     });
   }
+
+  // iOS text input clear buttons & auto-visibility
+  ['inputTagArtist', 'inputTagAlbum', 'inputTagYear'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      const updateClear = () => {
+        const wrapper = el.parentElement;
+        const clearBtn = wrapper ? wrapper.querySelector('.ios-clear-btn') : null;
+        if (clearBtn) {
+          if (el.value.length > 0) clearBtn.classList.add('visible');
+          else clearBtn.classList.remove('visible');
+        }
+      };
+      el.addEventListener('input', updateClear);
+      el.addEventListener('focus', updateClear);
+    }
+  });
 
   if (elements.btnOpenFileInfo) elements.btnOpenFileInfo.addEventListener('click', openFileInfoDialog);
   if (elements.btnCloseFileInfoDialog) elements.btnCloseFileInfoDialog.addEventListener('click', () => closeDialog());
@@ -702,7 +715,6 @@ function initEvents() {
         state.parts = [];
         renderParts();
         drawWaveform();
-        showSnackbar('All parts cleared.');
       }
     });
   }
@@ -799,13 +811,6 @@ async function processSelectedFile(file) {
     );
     if (elements.fileInput) elements.fileInput.value = '';
     return;
-  }
-
-  if (file.size > 100 * 1024 * 1024) {
-    const proceed = confirm(
-      'This file is larger than 100 MB. Processing might take a moment on mobile devices. Continue?'
-    );
-    if (!proceed) return;
   }
 
   stopPreview();
@@ -1839,7 +1844,6 @@ function finalizeProcessing() {
   requestAnimationFrame(() => {
     drawWaveform();
   });
-  showSnackbar(`Ready to split "${state.file.name}"!`);
 }
 
 // =============================================================================
@@ -2405,7 +2409,6 @@ function addSelectedSuggestions() {
   closeDialog();
   renderParts();
   drawWaveform();
-  showSnackbar(`Added ${selected.length} parts to split list.`);
 }
 
 // =============================================================================
@@ -2537,7 +2540,7 @@ function updateWheelBadges() {
   const targetInput = isStart ? elements.inputRangeStart : elements.inputRangeEnd;
   const curVal = targetInput ? targetInput.value : '00:00';
   if (elements.wheelTargetText) {
-    elements.wheelTargetText.textContent = isStart ? `Bắt đầu (${curVal})` : `Kết thúc (${curVal})`;
+    elements.wheelTargetText.textContent = isStart ? `Start (${curVal})` : `End (${curVal})`;
   }
 }
 
@@ -2613,13 +2616,13 @@ function validateRangeInputs() {
   const partDuration = endVal - startVal;
 
   if (isNaN(startVal) || startVal < 0) {
-    errorMsg = 'Thời gian bắt đầu không hợp lệ (mm:ss) ≥ 00:00.';
+    errorMsg = 'Start time must be a valid time (mm:ss) ≥ 00:00.';
   } else if (isNaN(endVal) || endVal > duration) {
-    errorMsg = `Thời gian kết thúc không được vượt quá độ dài bài (${formatMmSs(duration)}).`;
+    errorMsg = `End time cannot exceed track duration (${formatMmSs(duration)}).`;
   } else if (endVal <= startVal) {
-    errorMsg = 'Thời gian kết thúc phải lớn hơn thời gian bắt đầu.';
+    errorMsg = 'End time must be after start time.';
   } else if (partDuration < 1.0) {
-    errorMsg = 'Thời lượng đoạn phải từ 1.0 giây trở lên.';
+    errorMsg = 'Range duration must be at least 1.0 second.';
   }
 
   if (elements.rangeDurationText) {
@@ -2673,7 +2676,6 @@ function addRangePart() {
   closeDialog();
   renderParts();
   drawWaveform();
-  showSnackbar(`Part "${uniqueName}" added.`);
 }
 
 // =============================================================================
@@ -2838,12 +2840,6 @@ function deletePart(id) {
   state.parts.splice(partIndex, 1);
   renderParts();
   drawWaveform();
-
-  showSnackbar(`Deleted "${deleted.name}".`, 'Undo', () => {
-    state.parts.splice(partIndex, 0, deleted);
-    renderParts();
-    drawWaveform();
-  });
 }
 
 // =============================================================================
@@ -3155,7 +3151,6 @@ async function downloadBlob(blob, fileName, mimeType = 'audio/mpeg') {
           files: [file],
           title: fileName,
         });
-        showSnackbar(`Shared "${fileName}".`);
         return;
       }
     } catch (err) {
@@ -3173,8 +3168,6 @@ async function downloadBlob(blob, fileName, mimeType = 'audio/mpeg') {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-
-  showSnackbar(`Downloaded "${fileName}".`);
 
   setTimeout(() => {
     URL.revokeObjectURL(url);
@@ -3268,6 +3261,18 @@ function openEditTagsDialog() {
   if (elements.inputTagYear) {
     elements.inputTagYear.value = meta.year || '';
   }
+
+  // Update iOS clear buttons
+  ['inputTagArtist', 'inputTagAlbum', 'inputTagYear'].forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) {
+      const clearBtn = el.parentElement ? el.parentElement.querySelector('.ios-clear-btn') : null;
+      if (clearBtn) {
+        if (el.value.length > 0) clearBtn.classList.add('visible');
+        else clearBtn.classList.remove('visible');
+      }
+    }
+  });
 
   updateModalCoverView();
 
@@ -3414,7 +3419,6 @@ function saveEditTags() {
 
   updateMainCardCoverView();
   closeDialog();
-  showSnackbar('Tags and cover artwork updated!');
 }
 
 function updateMainCardCoverView() {
@@ -3754,6 +3758,15 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
+function clearIosInput(inputId, btn) {
+  const el = document.getElementById(inputId);
+  if (el) {
+    el.value = '';
+    el.focus();
+    if (btn) btn.classList.remove('visible');
+  }
+}
+
 // =============================================================================
 // Window Exports (for inline HTML handlers, mobile resilience, and testing)
 // =============================================================================
@@ -3762,7 +3775,9 @@ window.closeDialog = closeDialog;
 window.saveEditTags = saveEditTags;
 window.removeCoverArtInModal = removeCoverArtInModal;
 window.processCoverImageFile = processCoverImageFile;
+window.clearIosInput = clearIosInput;
 window.openFileInfoDialog = openFileInfoDialog;
 window.openAutoDialog = openAutoDialog;
 window.openRangeDialog = openRangeDialog;
+
 

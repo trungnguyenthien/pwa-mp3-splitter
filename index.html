@@ -7,7 +7,7 @@
   <meta name="description" content="Split MP3 audio files fast, losslessly and 100% offline in your browser. Zero quality loss, no server upload, frame-accurate cutting.">
 
   <!-- PWA & Mobile Capabilities -->
-  <link rel="manifest" href="./manifest.webmanifest?v=32">
+  <link rel="manifest" href="./manifest.webmanifest?v=35">
   <meta name="theme-color" content="#141518">
   <meta name="mobile-web-app-capable" content="yes">
   
@@ -22,7 +22,7 @@
   <link rel="icon" type="image/png" href="./icons/favicon.png">
 
   <!-- Versioned Stylesheet adhering to pwa-standards.md -->
-  <link rel="stylesheet" href="./styles.css?v=32">
+  <link rel="stylesheet" href="./styles.css?v=35">
 </head>
 <body>
 
@@ -355,8 +355,8 @@
   <div id="rangeDialog" class="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="rangeDialogTitle">
     <div class="dialog-panel range-dialog-panel">
       <div class="dialog-header">
-        <h2 id="rangeDialogTitle" class="dialog-title">Thêm đoạn thời gian</h2>
-        <button id="btnCloseRangeDialog" class="btn-icon" aria-label="Đóng hộp thoại">
+        <h2 id="rangeDialogTitle" class="dialog-title">Add Time Range</h2>
+        <button id="btnCloseRangeDialog" class="btn-icon" aria-label="Close dialog">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"/>
             <line x1="6" y1="6" x2="18" y2="18"/>
@@ -367,10 +367,10 @@
       <div class="dialog-body range-dialog-body">
         <!-- Dual Touch Cards for Start & End Time -->
         <div class="time-cards-grid">
-          <div class="time-card active" id="cardRangeStart" role="button" tabindex="0" aria-label="Chọn thời gian bắt đầu">
+          <div class="time-card active" id="cardRangeStart" role="button" tabindex="0" aria-label="Select start time">
             <div class="time-card-header">
               <span class="time-card-dot"></span>
-              <span class="time-card-title">BẮT ĐẦU</span>
+              <span class="time-card-title">START TIME</span>
               <span class="time-card-badge">Start</span>
             </div>
             <div class="time-card-input-wrapper">
@@ -379,10 +379,10 @@
             <div id="rangeStartHelper" class="time-card-sub tabular-nums">00:00.0 (0s)</div>
           </div>
 
-          <div class="time-card" id="cardRangeEnd" role="button" tabindex="0" aria-label="Chọn thời gian kết thúc">
+          <div class="time-card" id="cardRangeEnd" role="button" tabindex="0" aria-label="Select end time">
             <div class="time-card-header">
               <span class="time-card-dot"></span>
-              <span class="time-card-title">KẾT THÚC</span>
+              <span class="time-card-title">END TIME</span>
               <span class="time-card-badge">End</span>
             </div>
             <div class="time-card-input-wrapper">
@@ -395,7 +395,7 @@
         <!-- Part Duration Pill Indicator -->
         <div class="time-duration-pill" id="rangeDurationPill">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          <span class="duration-label">Thời lượng đoạn:</span>
+          <span class="duration-label">Range Duration:</span>
           <span id="rangeDurationText" class="duration-val tabular-nums">01:00 (60s)</span>
         </div>
 
@@ -404,15 +404,15 @@
           <div class="time-wheel-header">
             <div class="time-wheel-target-info">
               <span class="wheel-target-dot"></span>
-              <span class="wheel-target-label">Chỉnh:</span>
-              <span id="wheelTargetText" class="wheel-target-name">Bắt đầu (00:00)</span>
+              <span class="wheel-target-label">Adjust:</span>
+              <span id="wheelTargetText" class="wheel-target-name">Start (00:00)</span>
             </div>
 
             <div class="time-wheel-actions">
-              <button type="button" id="btnWheelStepMinus10" class="btn-wheel-step tabular-nums" title="Lùi 10s">-10s</button>
-              <button type="button" id="btnWheelStepMinus1" class="btn-wheel-step tabular-nums" title="Lùi 1s">-1s</button>
-              <button type="button" id="btnWheelStepPlus1" class="btn-wheel-step tabular-nums" title="Tăng 1s">+1s</button>
-              <button type="button" id="btnWheelStepPlus10" class="btn-wheel-step tabular-nums" title="Tăng 10s">+10s</button>
+              <button type="button" id="btnWheelStepMinus10" class="btn-wheel-step tabular-nums" title="Back 10s">-10s</button>
+              <button type="button" id="btnWheelStepMinus1" class="btn-wheel-step tabular-nums" title="Back 1s">-1s</button>
+              <button type="button" id="btnWheelStepPlus1" class="btn-wheel-step tabular-nums" title="Forward 1s">+1s</button>
+              <button type="button" id="btnWheelStepPlus10" class="btn-wheel-step tabular-nums" title="Forward 10s">+10s</button>
             </div>
           </div>
 
@@ -427,14 +427,14 @@
           </div>
 
           <div class="time-wheel-footer">
-            <span class="time-wheel-hint">💡 Chạm card Bắt đầu / Kết thúc • Vuốt bánh xe để cuộn giây</span>
+            <span class="time-wheel-hint">💡 Tap Start / End card • Drag wheel to adjust seconds</span>
           </div>
         </div>
 
         <!-- Quick chips -->
         <div class="quick-chips-row">
-          <button type="button" id="chipStartFromZero" class="btn btn-tonal btn-sm">Từ đầu (0s)</button>
-          <button type="button" id="chipEndAtTotal" class="btn btn-tonal btn-sm">Đến hết bài</button>
+          <button type="button" id="chipStartFromZero" class="btn btn-tonal btn-sm">From start (0s)</button>
+          <button type="button" id="chipEndAtTotal" class="btn btn-tonal btn-sm">To end of track</button>
         </div>
 
         <div id="rangeErrorAlert" class="form-helper error hidden"></div>
@@ -579,91 +579,156 @@
     </div>
   </div>
 
-  <!-- Edit Tags & Artwork Modal -->
+  <!-- Edit Tags & Artwork Modal (iOS Style) -->
   <div id="editTagsModal" class="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="editTagsDialogTitle">
-    <div class="dialog-panel" style="max-width: 480px;">
-      <div class="dialog-header">
-        <div style="display: flex; align-items: center; gap: 10px;">
-          <div style="width: 36px; height: 36px; min-width: 36px; border-radius: 50%; background: var(--md-sys-color-primary-container); display: flex; align-items: center; justify-content: center; color: var(--md-sys-color-on-primary-container);" aria-hidden="true">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <div class="dialog-panel ios-dialog-panel" style="max-width: 490px;">
+      <div class="ios-grabber-bar" aria-hidden="true"></div>
+
+      <div class="dialog-header ios-dialog-header">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div class="ios-header-icon" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M12 20h9"/>
               <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
             </svg>
           </div>
           <div>
-            <h2 id="editTagsDialogTitle" class="dialog-title" style="font-size: 1.125rem;">Edit Metadata & Artwork</h2>
-            <div style="font-size: 0.75rem; color: var(--md-sys-color-on-surface-variant);">Embedded losslessly into all exported parts</div>
+            <h2 id="editTagsDialogTitle" class="dialog-title" style="font-size: 1.0625rem; font-weight: 600; letter-spacing: -0.01em;">Edit Song Details</h2>
+            <div style="font-size: 0.75rem; color: rgba(235, 235, 245, 0.6);">Embedded losslessly into exported tracks</div>
           </div>
         </div>
-        <button id="btnCloseEditTagsDialog" class="btn-icon" aria-label="Close dialog" onclick="closeDialog()">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <button id="btnCloseEditTagsDialog" class="ios-circle-close-btn" aria-label="Close dialog" onclick="closeDialog()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <line x1="18" y1="6" x2="6" y2="18"/>
             <line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
         </button>
       </div>
 
-      <div class="dialog-body" style="padding: 18px 20px; gap: 16px;">
-        <!-- Artwork upload section -->
-        <div class="edit-tags-cover-container">
-          <div class="edit-cover-preview-box" id="modalCoverBox" tabindex="0" role="button" aria-label="Upload or change cover art" onclick="document.getElementById('coverArtFileInput').click()">
-            <img id="modalCoverImg" class="edit-cover-img hidden" alt="Artwork preview">
-            <div id="modalCoverPlaceholder" class="edit-cover-placeholder">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                <circle cx="8.5" cy="8.5" r="1.5"/>
-                <polyline points="21 15 16 10 5 21"/>
-              </svg>
-              <span>Upload Cover Art</span>
+      <div class="dialog-body ios-dialog-body" style="padding: 16px 20px; gap: 16px;">
+        <!-- iOS Style Artwork Section -->
+        <div class="ios-form-section">
+          <div class="ios-section-caption">
+            <span>ALBUM ARTWORK</span>
+            <span style="font-size: 0.68rem; font-weight: 400; text-transform: none; color: rgba(235,235,245,0.45);">500×500 Auto-scaled</span>
+          </div>
+
+          <div class="ios-artwork-card">
+            <div class="ios-cover-preview" id="modalCoverBox" tabindex="0" role="button" aria-label="Upload or change cover art" onclick="document.getElementById('coverArtFileInput').click()">
+              <img id="modalCoverImg" class="ios-cover-img hidden" alt="Artwork preview">
+              <div id="modalCoverPlaceholder" class="ios-cover-placeholder">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                  <circle cx="8.5" cy="8.5" r="1.5"/>
+                  <polyline points="21 15 16 10 5 21"/>
+                </svg>
+                <span>Add Photo</span>
+              </div>
+              <div class="ios-cover-hover-overlay">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                <span>Change</span>
+              </div>
             </div>
-            <div class="edit-cover-hover-overlay">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                <polyline points="17 8 12 3 7 8"/>
-                <line x1="12" y1="3" x2="12" y2="15"/>
-              </svg>
-              <span>Change Image</span>
+            <input type="file" id="coverArtFileInput" accept="image/jpeg,image/png,image/webp" class="hidden">
+
+            <div class="ios-artwork-details">
+              <div class="ios-artwork-title">Cover Photo</div>
+              <div class="ios-artwork-subtext">JPG, PNG, WEBP. Optimized automatically to ~40 KB to keep downloads fast.</div>
+              <div class="ios-artwork-actions">
+                <button type="button" id="btnUploadCoverArt" class="ios-btn-pill" onclick="document.getElementById('coverArtFileInput').click()">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                  <span>Choose Photo</span>
+                </button>
+                <button type="button" id="btnRemoveCoverArt" class="ios-btn-pill ios-btn-destructive hidden" onclick="removeCoverArtInModal()">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                  <span>Remove</span>
+                </button>
+              </div>
             </div>
           </div>
-          <input type="file" id="coverArtFileInput" accept="image/jpeg,image/png,image/webp" class="hidden">
+        </div>
 
-          <div class="edit-cover-actions">
-            <div style="font-weight: 600; font-size: 0.875rem; color: var(--md-sys-color-on-surface); margin-bottom: 2px;">Cover Artwork</div>
-            <div style="font-size: 0.75rem; color: var(--md-sys-color-on-surface-variant); line-height: 1.4; margin-bottom: 8px;">Supports JPG, PNG, WEBP. Auto-optimized to 500x500 (~40 KB) to keep downloads lightweight.</div>
-            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-              <button type="button" id="btnUploadCoverArt" class="btn btn-tonal btn-sm" onclick="document.getElementById('coverArtFileInput').click()">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                <span>Upload Image</span>
-              </button>
-              <button type="button" id="btnRemoveCoverArt" class="btn btn-tonal btn-sm hidden" style="color: var(--md-sys-color-error);" onclick="removeCoverArtInModal()">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                <span>Remove</span>
-              </button>
+        <!-- iOS Inset Grouped Form for Track Metadata -->
+        <div class="ios-form-section">
+          <div class="ios-section-caption">
+            <span>TRACK METADATA</span>
+            <span style="font-size: 0.68rem; font-weight: 400; text-transform: none; color: rgba(235,235,245,0.45);">ID3v2 &amp; MP4 Atoms</span>
+          </div>
+
+          <div class="ios-inset-group">
+            <!-- Artist Row -->
+            <div class="ios-form-row">
+              <div class="ios-row-icon ios-icon-artist" aria-hidden="true">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                  <circle cx="12" cy="7" r="4"/>
+                </svg>
+              </div>
+              <label for="inputTagArtist" class="ios-row-label">Artist</label>
+              <div class="ios-input-wrapper">
+                <input type="text" id="inputTagArtist" class="ios-text-input" placeholder="e.g. The Beatles, Adele" maxlength="120" autocomplete="off" spellcheck="false">
+                <button type="button" class="ios-clear-btn" aria-label="Clear Artist" onclick="clearIosInput('inputTagArtist', this)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M15 9l-6 6M9 9l6 6" stroke="rgba(0,0,0,0.8)" stroke-width="2.2" stroke-linecap="round"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Album Row -->
+            <div class="ios-form-row">
+              <div class="ios-row-icon ios-icon-album" aria-hidden="true">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/>
+                  <circle cx="12" cy="12" r="3"/>
+                </svg>
+              </div>
+              <label for="inputTagAlbum" class="ios-row-label">Album</label>
+              <div class="ios-input-wrapper">
+                <input type="text" id="inputTagAlbum" class="ios-text-input" placeholder="e.g. Greatest Hits, Single" maxlength="120" autocomplete="off" spellcheck="false">
+                <button type="button" class="ios-clear-btn" aria-label="Clear Album" onclick="clearIosInput('inputTagAlbum', this)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M15 9l-6 6M9 9l6 6" stroke="rgba(0,0,0,0.8)" stroke-width="2.2" stroke-linecap="round"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <!-- Year Row -->
+            <div class="ios-form-row">
+              <div class="ios-row-icon ios-icon-year" aria-hidden="true">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                  <line x1="16" y1="2" x2="16" y2="6"/>
+                  <line x1="8" y1="2" x2="8" y2="6"/>
+                  <line x1="3" y1="10" x2="21" y2="10"/>
+                </svg>
+              </div>
+              <label for="inputTagYear" class="ios-row-label">Year</label>
+              <div class="ios-input-wrapper">
+                <input type="text" id="inputTagYear" class="ios-text-input" placeholder="e.g. 2026" maxlength="4" pattern="[0-9]{4}" inputmode="numeric" autocomplete="off">
+                <button type="button" class="ios-clear-btn" aria-label="Clear Year" onclick="clearIosInput('inputTagYear', this)">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <circle cx="12" cy="12" r="10"/>
+                    <path d="M15 9l-6 6M9 9l6 6" stroke="rgba(0,0,0,0.8)" stroke-width="2.2" stroke-linecap="round"/>
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-
-        <!-- Tag input fields -->
-        <div class="edit-tags-form-group">
-          <label for="inputTagArtist" class="edit-tags-label">Artist / Nghệ sĩ</label>
-          <input type="text" id="inputTagArtist" class="text-input" placeholder="e.g. Sơn Tùng M-TP, Coldplay" maxlength="120" autocomplete="off">
-        </div>
-
-        <div class="edit-tags-form-group">
-          <label for="inputTagAlbum" class="edit-tags-label">Album / Tuyển tập</label>
-          <input type="text" id="inputTagAlbum" class="text-input" placeholder="e.g. Greatest Hits, Acoustic Live" maxlength="120" autocomplete="off">
-        </div>
-
-        <div class="edit-tags-form-group">
-          <label for="inputTagYear" class="edit-tags-label">Year / Năm phát hành</label>
-          <input type="text" id="inputTagYear" class="text-input" placeholder="e.g. 2026" maxlength="4" pattern="[0-9]{4}" autocomplete="off">
         </div>
       </div>
 
-      <div class="dialog-footer" style="display: flex; gap: 10px; justify-content: flex-end;">
-        <button id="btnCancelEditTags" type="button" class="btn btn-tonal" onclick="closeDialog()">Cancel</button>
-        <button id="btnSaveTags" type="button" class="btn btn-primary" style="min-width: 110px;" onclick="saveEditTags()">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+      <div class="dialog-footer ios-dialog-footer">
+        <button id="btnCancelEditTags" type="button" class="ios-sheet-btn-secondary" onclick="closeDialog()">Cancel</button>
+        <button id="btnSaveTags" type="button" class="ios-sheet-btn-primary" onclick="saveEditTags()">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><polyline points="20 6 9 17 4 12"/></svg>
           <span>Save Tags</span>
         </button>
       </div>
@@ -673,13 +738,20 @@
   <!-- Shared Preview Audio Element -->
   <audio id="previewAudio" preload="auto" class="hidden"></audio>
 
-  <!-- Global Snackbar / Toast -->
+  <!-- Global Snackbar / Toast (Error & Alert Notifications Only) -->
   <div id="snackbar" class="snackbar-container" role="status" aria-live="polite">
+    <span class="snackbar-icon" aria-hidden="true">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF453A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/>
+        <line x1="12" y1="8" x2="12" y2="12"/>
+        <line x1="12" y1="16" x2="12.01" y2="16"/>
+      </svg>
+    </span>
     <span id="snackbarText" class="snackbar-text"></span>
     <button id="snackbarAction" class="snackbar-action hidden"></button>
   </div>
 
   <!-- Application Logic with Cache-Busting adhering to pwa-standards.md -->
-  <script defer src="./app.js?v=32"></script>
+  <script defer src="./app.js?v=35"></script>
 </body>
 </html>

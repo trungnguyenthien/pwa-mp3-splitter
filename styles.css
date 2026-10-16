@@ -1073,109 +1073,424 @@ body {
   background-color: var(--md-sys-color-surface);
 }
 
-/* Edit Tags & Artwork Modal Styles */
-.edit-tags-cover-container {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  background: var(--md-sys-color-surface-variant);
-  border: 1px solid var(--md-sys-color-outline-variant);
-  border-radius: var(--radius-md);
-  padding: 14px;
+/* =============================================================================
+   iOS Style Form Elements (Apple Human Interface Guidelines)
+   ============================================================================= */
+.ios-dialog-panel {
+  background: #1C1C1E !important;
+  border: 0.5px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 20px !important;
 }
 
-.edit-cover-preview-box {
-  width: 90px;
-  height: 90px;
-  min-width: 90px;
-  border-radius: var(--radius-sm);
-  background: rgba(0, 0, 0, 0.35);
-  border: 1.5px dashed var(--md-sys-color-outline);
+.ios-grabber-bar {
+  width: 38px;
+  height: 5px;
+  border-radius: 2.5px;
+  background: rgba(255, 255, 255, 0.28);
+  margin: 10px auto -6px;
+  flex-shrink: 0;
+}
+
+.ios-dialog-header {
+  padding: 16px 20px 14px !important;
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.ios-header-icon {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 10px;
+  background: rgba(48, 209, 88, 0.18);
+  color: #30D158;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ios-circle-close-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(235, 235, 245, 0.8);
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.1s ease;
+}
+
+.ios-circle-close-btn:hover {
+  background: rgba(255, 255, 255, 0.22);
+  color: #FFFFFF;
+}
+
+.ios-circle-close-btn:active {
+  transform: scale(0.92);
+}
+
+.ios-form-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.ios-section-caption {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(235, 235, 245, 0.55);
+  padding: 0 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Inset Group Container */
+.ios-inset-group {
+  background: rgba(255, 255, 255, 0.065);
+  border: 0.5px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  overflow: hidden;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+/* Inset Group Row */
+.ios-form-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 14px;
+  min-height: 48px;
+  box-sizing: border-box;
+  transition: background-color 0.15s ease;
+}
+
+.ios-form-row:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.ios-form-row:focus-within {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+/* Classic iOS Inset Grouped indented hairline divider */
+.ios-form-row:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 54px;
+  right: 0;
+  bottom: 0;
+  height: 0.5px;
+  background-color: rgba(255, 255, 255, 0.1);
+  pointer-events: none;
+}
+
+/* Icon Squircles */
+.ios-row-icon {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  border-radius: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ios-icon-artist {
+  background: rgba(10, 132, 255, 0.18);
+  color: #0A84FF;
+}
+
+.ios-icon-album {
+  background: rgba(191, 90, 242, 0.18);
+  color: #BF5AF2;
+}
+
+.ios-icon-year {
+  background: rgba(255, 159, 10, 0.18);
+  color: #FF9F0A;
+}
+
+.ios-row-label {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: #FFFFFF;
+  min-width: 52px;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.ios-input-wrapper {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+}
+
+/* The input field itself: transparent, sleek, SF font */
+.ios-text-input {
+  width: 100%;
+  flex: 1;
+  min-width: 0;
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", system-ui, sans-serif;
+  font-size: 0.9375rem;
+  color: #FFFFFF !important;
+  caret-color: #30D158;
+  padding: 6px 0;
+  margin: 0;
+  text-align: left;
+  transition: color 0.15s ease;
+}
+
+.ios-text-input::placeholder {
+  color: rgba(235, 235, 245, 0.35);
+  font-weight: 400;
+}
+
+/* Clear Button */
+.ios-clear-btn {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  border-radius: 50%;
+  background: transparent;
+  border: none;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: rgba(235, 235, 245, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.1s ease, color 0.15s ease;
+  flex-shrink: 0;
+}
+
+.ios-clear-btn.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.ios-clear-btn:hover {
+  color: rgba(235, 235, 245, 0.85);
+  transform: scale(1.08);
+}
+
+/* iOS Artwork Card */
+.ios-artwork-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: rgba(255, 255, 255, 0.065);
+  border: 0.5px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  padding: 12px 14px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+.ios-cover-preview {
+  width: 76px;
+  height: 76px;
+  min-width: 76px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.15);
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   overflow: hidden;
   cursor: pointer;
-  transition: border-color 0.2s ease, transform 0.15s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  transition: transform 0.15s ease, border-color 0.2s ease;
 }
 
-.edit-cover-preview-box:hover,
-.edit-cover-preview-box:focus-visible {
-  border-color: var(--md-sys-color-primary);
-  transform: scale(1.02);
+.ios-cover-preview:hover {
+  transform: scale(1.03);
+  border-color: #30D158;
 }
 
-.edit-cover-img {
+.ios-cover-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
 }
 
-.edit-cover-img.hidden {
-  display: none;
-}
-
-.edit-cover-placeholder {
+.ios-cover-placeholder {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 6px;
-  gap: 4px;
-  color: var(--md-sys-color-on-surface-variant);
+  gap: 3px;
+  color: rgba(235, 235, 245, 0.5);
   font-size: 0.68rem;
-  line-height: 1.2;
+  font-weight: 500;
 }
 
-.edit-cover-hover-overlay {
+.ios-cover-hover-overlay {
   position: absolute;
   inset: 0;
   background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(2px);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: #ffffff;
+  color: #FFFFFF;
   font-size: 0.68rem;
-  gap: 4px;
+  font-weight: 600;
+  gap: 3px;
   opacity: 0;
   transition: opacity 0.2s ease;
 }
 
-.edit-cover-preview-box:hover .edit-cover-hover-overlay {
+.ios-cover-preview:hover .ios-cover-hover-overlay {
   opacity: 1;
 }
 
-.edit-cover-actions {
-  flex: 1 1 auto;
+.ios-artwork-details {
+  flex: 1;
   min-width: 0;
 }
 
-.edit-tags-form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.ios-artwork-title {
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #FFFFFF;
+  margin-bottom: 2px;
 }
 
-.edit-tags-label {
+.ios-artwork-subtext {
+  font-size: 0.75rem;
+  color: rgba(235, 235, 245, 0.6);
+  line-height: 1.35;
+  margin-bottom: 8px;
+}
+
+.ios-artwork-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ios-btn-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #FFFFFF;
+  border: none;
+  border-radius: 9999px;
+  padding: 6px 14px;
   font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.08s ease;
+}
+
+.ios-btn-pill:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.ios-btn-pill:active {
+  transform: scale(0.96);
+}
+
+.ios-btn-destructive {
+  background: rgba(255, 69, 58, 0.15) !important;
+  color: #FF453A !important;
+}
+
+.ios-btn-destructive:hover {
+  background: rgba(255, 69, 58, 0.25) !important;
+}
+
+.ios-dialog-footer {
+  border-top: 0.5px solid rgba(255, 255, 255, 0.1) !important;
+  padding: 14px 20px !important;
+  background: transparent !important;
+}
+
+.ios-sheet-btn-secondary {
+  height: 42px;
+  padding: 0 18px;
+  border-radius: 9999px;
+  border: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(235, 235, 245, 0.8);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s ease, transform 0.08s ease;
+}
+
+.ios-sheet-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.ios-sheet-btn-secondary:active {
+  transform: scale(0.96);
+}
+
+.ios-sheet-btn-primary {
+  height: 42px;
+  min-width: 110px;
+  padding: 0 20px;
+  border-radius: 9999px;
+  border: none;
+  background: #30D158;
+  color: #041a0b;
+  font-size: 0.9375rem;
   font-weight: 600;
-  color: var(--md-sys-color-on-surface-variant);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(48, 209, 88, 0.35);
+  transition: background-color 0.15s ease, transform 0.08s ease, box-shadow 0.15s ease;
+}
+
+.ios-sheet-btn-primary:hover {
+  background: #28cd4f;
+  box-shadow: 0 4px 14px rgba(48, 209, 88, 0.45);
+}
+
+.ios-sheet-btn-primary:active {
+  transform: scale(0.96);
 }
 
 @media (max-width: 420px) {
-  .edit-tags-cover-container {
+  .ios-artwork-card {
     flex-direction: column;
     text-align: center;
     align-items: center;
   }
-  .edit-cover-actions {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
+  .ios-artwork-actions {
+    justify-content: center;
   }
 }
 
@@ -1947,46 +2262,69 @@ input[type="range"]::-moz-range-thumb {
   box-shadow: 0 0 8px rgba(0, 230, 118, 0.25);
 }
 
-/* Snackbar / Toast */
+/* Snackbar / Toast (Alert & Error Notifications) */
 .snackbar-container {
   position: fixed;
-  bottom: calc(var(--safe-bottom) + 16px);
+  bottom: calc(var(--safe-bottom) + 20px);
   left: 50%;
   transform: translateX(-50%) translateY(100px);
   z-index: 150;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
-  min-width: 300px;
+  gap: 12px;
+  min-width: 280px;
   max-width: 90vw;
-  padding: 14px 18px;
-  border-radius: var(--radius-sm);
-  background-color: var(--md-sys-color-inverse-surface);
-  color: var(--md-sys-color-inverse-on-surface);
-  box-shadow: var(--elevation-3);
+  padding: 12px 18px;
+  border-radius: 14px;
+  background: rgba(30, 22, 24, 0.94);
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 69, 58, 0.35);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.55), 0 0 1px rgba(255, 69, 58, 0.5);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
   opacity: 0;
-  transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), opacity 0.2s ease;
+  pointer-events: none;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease;
 }
 
 .snackbar-container.show {
   transform: translateX(-50%) translateY(0);
   opacity: 1;
+  pointer-events: auto;
+}
+
+.snackbar-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .snackbar-text {
   font-size: 0.875rem;
+  font-weight: 500;
+  line-height: 1.4;
+  color: #FFFFFF;
+  flex: 1;
 }
 
 .snackbar-action {
   font-weight: 600;
-  color: var(--md-sys-color-inverse-primary);
-  background: transparent;
-  border: none;
+  color: #FF453A;
+  background: rgba(255, 69, 58, 0.12);
+  border: 1px solid rgba(255, 69, 58, 0.25);
+  border-radius: 8px;
   font-family: inherit;
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 5px 12px;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+
+.snackbar-action:hover {
+  background: rgba(255, 69, 58, 0.22);
 }
 
 /* Spinner */
