@@ -389,7 +389,8 @@ body {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 32px 20px;
+  padding: 18px 16px;
+  gap: 10px;
   border: 2px dashed var(--md-sys-color-outline);
   border-radius: var(--radius-md);
   background-color: var(--md-sys-color-surface-variant);
@@ -400,28 +401,41 @@ body {
 .dropzone:hover,
 .dropzone.drag-over {
   border-color: var(--md-sys-color-primary);
-  background-color: rgba(103, 80, 164, 0.06);
+  background-color: rgba(103, 80, 164, 0.08);
 }
 
 .dropzone-icon {
-  width: 56px;
-  height: 56px;
+  width: 36px;
+  height: 36px;
   color: var(--md-sys-color-primary);
-  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.2s ease;
 }
 
-.dropzone-title {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: var(--md-sys-color-on-surface);
-  margin-bottom: 6px;
+.dropzone:hover .dropzone-icon,
+.dropzone.drag-over .dropzone-icon {
+  transform: translateY(-2px);
 }
 
-.dropzone-subtitle {
+.dropzone-action {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.dropzone-hint {
   font-size: 0.875rem;
+  font-weight: 500;
   color: var(--md-sys-color-on-surface-variant);
-  margin-bottom: 16px;
-  max-width: 400px;
+}
+
+.dropzone-title,
+.dropzone-subtitle {
+  display: none;
 }
 
 /* File Info View (When file is loaded) */

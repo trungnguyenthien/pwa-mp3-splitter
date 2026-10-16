@@ -27,8 +27,8 @@ const state = {
   suggestions: [], // [{ id, name, start, end, duration, selected }]
   settings: {
     silenceDb: -32,
-    minSilenceSec: 0.25,
-    minPartSec: 95,
+    minSilenceSec: 0.35,
+    minPartSec: 85,
   },
   ui: {
     loading: false,
@@ -390,7 +390,7 @@ function initEvents() {
 
   if (elements.btnPresetMusic) {
     elements.btnPresetMusic.addEventListener('click', () => {
-      applyDetectionPreset(-32, 0.25, 95, elements.btnPresetMusic);
+      applyDetectionPreset(-32, 0.35, 85, elements.btnPresetMusic);
     });
   }
   if (elements.btnPresetSpeech) {
