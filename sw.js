@@ -3,13 +3,14 @@
  * Adheres strictly to PWA Standards & WebAPK Isolation Rules
  */
 
-const CACHE_NAME = 'mp3-splitter-v24';
+const CACHE_NAME = 'mp3-splitter-v25';
 
 const PRECACHE_ASSETS = [
-  './index.html?v=24',
-  './styles.css?v=24',
-  './app.js?v=24',
-  './mp3-worker.js?v=24',
+  './',
+  './index.html?v=25',
+  './styles.css?v=25',
+  './app.js?v=25',
+  './mp3-worker.js?v=25',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',
@@ -77,8 +78,8 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(event.request).catch(async () => {
         const cachedIndex =
-          (await caches.match('./index.html?v=11')) ||
-          (await caches.match('./index.html'));
+          (await caches.match('./index.html', { ignoreSearch: true })) ||
+          (await caches.match('./', { ignoreSearch: true }));
         return cachedIndex || Response.error();
       })
     );

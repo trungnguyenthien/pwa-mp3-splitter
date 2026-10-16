@@ -1,9 +1,9 @@
 {
-  "id": "./?app=mp3-splitter",
+  "id": "/pwa-mp3-splitter/",
   "name": "MP3 Splitter — Lossless Audio Cutter",
   "short_name": "MP3 Splitter",
   "description": "Fast, 100% offline in-browser MP3 splitter. No upload, zero quality loss, precise frame cuts.",
-  "start_url": "./index.html",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",

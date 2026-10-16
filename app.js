@@ -201,7 +201,7 @@ function initElements() {
 function initWorker() {
   try {
     if (window.Worker && window.location.protocol !== 'file:') {
-      mp3Worker = new Worker('./mp3-worker.js?v=11');
+      mp3Worker = new Worker('./mp3-worker.js?v=25');
       mp3Worker.onmessage = handleWorkerMessage;
       mp3Worker.onerror = (err) => {
         console.warn('Worker error, switching to in-thread processing:', err);
@@ -277,11 +277,30 @@ function initServiceWorker() {
       });
   }
 
-  // PWA Install Prompt handling
+  // Standalone display mode check (PWA already running installed)
+  const isStandalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    window.navigator.standalone === true;
+
+  const isIOS =
+    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+  // If already running in standalone mode, guarantee install button is hidden
+  if (isStandalone && elements.btnInstall) {
+    elements.btnInstall.classList.add('hidden');
+  } else if (isIOS && elements.btnInstall) {
+    // iOS Safari does not support beforeinstallprompt; show button to open instructions modal
+    elements.btnInstall.classList.remove('hidden');
+  }
+
+  // PWA Install Prompt handling (Android Chrome / Desktop)
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     state.deferredInstallPrompt = e;
-    if (elements.btnInstall) elements.btnInstall.classList.remove('hidden');
+    if (!isStandalone && elements.btnInstall) {
+      elements.btnInstall.classList.remove('hidden');
+    }
   });
 
   window.addEventListener('appinstalled', () => {
