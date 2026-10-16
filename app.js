@@ -171,7 +171,7 @@ function initElements() {
 function initWorker() {
   try {
     if (window.Worker && window.location.protocol !== 'file:') {
-      mp3Worker = new Worker('./mp3-worker.js?v=3');
+      mp3Worker = new Worker('./mp3-worker.js?v=4');
       mp3Worker.onmessage = handleWorkerMessage;
       mp3Worker.onerror = (err) => {
         console.warn('Worker error, switching to in-thread processing:', err);
@@ -327,11 +327,12 @@ function initEvents() {
     });
   }
 
-  // Settings sliders
+  // Settings sliders (Real-time live analysis)
   if (elements.inputSilenceDb) {
     elements.inputSilenceDb.addEventListener('input', (e) => {
       state.settings.silenceDb = parseFloat(e.target.value);
       elements.valSilenceDb.textContent = `${state.settings.silenceDb} dB`;
+      analyzeSilence();
     });
   }
 
@@ -339,6 +340,7 @@ function initEvents() {
     elements.inputMinSilence.addEventListener('input', (e) => {
       state.settings.minSilenceSec = parseFloat(e.target.value);
       elements.valMinSilence.textContent = `${state.settings.minSilenceSec}s`;
+      analyzeSilence();
     });
   }
 
@@ -346,6 +348,7 @@ function initEvents() {
     elements.inputMinPart.addEventListener('input', (e) => {
       state.settings.minPartSec = parseFloat(e.target.value);
       elements.valMinPart.textContent = `${state.settings.minPartSec}s`;
+      analyzeSilence();
     });
   }
 
@@ -763,7 +766,7 @@ function sliceMp3Direct({ buffer, startByte, endByte, partName }) {
 }
 
 // =============================================================================
-// Waveform & Loudness Peak Computation (Chunked Web Audio)
+// Waveform & Loudness Peak Computation (Accurate Web Audio Decoding)
 // =============================================================================
 async function computePeaks() {
   if (!state.file || !state.file.buffer || !state.index) return;
@@ -780,64 +783,120 @@ async function computePeaks() {
     }
 
     const duration = state.index.duration;
-    const windowSec = 0.05;
+    const windowSec = 0.05; // 50 ms window
     const totalWindows = Math.max(1, Math.ceil(duration / windowSec));
     const peaks = new Float32Array(totalWindows);
     peaks.fill(-60);
 
-    const chunkDuration = 30;
-    const totalChunks = Math.ceil(duration / chunkDuration);
-    const frameOffsets = state.index.frameOffsets;
-    const frameDuration = state.index.frameDuration;
+    updateLoadingProgress(60, 'Decoding audio for waveform & silence analysis...');
 
-    for (let c = 0; c < totalChunks; c++) {
-      const chunkStartSec = c * chunkDuration;
-      const chunkEndSec = Math.min(duration, (c + 1) * chunkDuration);
+    // Attempt full buffer decode for 100% accurate PCM data and bit-reservoir continuity
+    let fullAudioBuffer = null;
+    try {
+      fullAudioBuffer = await decodeAudioDataAsync(sharedAudioContext, state.file.buffer.slice(0));
+    } catch (fullErr) {
+      console.warn('Full buffer decode failed, attempting chunked decode fallback:', fullErr);
+    }
 
-      const startFrame = Math.floor(chunkStartSec / frameDuration);
-      const endFrame = Math.min(frameOffsets.length, Math.ceil(chunkEndSec / frameDuration));
+    if (fullAudioBuffer) {
+      const channelData = fullAudioBuffer.getChannelData(0);
+      const sampleRate = fullAudioBuffer.sampleRate;
+      const windowSizeSamples = Math.floor(sampleRate * windowSec);
 
-      if (startFrame >= frameOffsets.length) break;
+      for (let w = 0; w < totalWindows; w++) {
+        const startSample = w * windowSizeSamples;
+        const endSample = Math.min(channelData.length, (w + 1) * windowSizeSamples);
 
-      const startByte = frameOffsets[startFrame];
-      const endByte = endFrame < frameOffsets.length ? frameOffsets[endFrame] : state.file.buffer.byteLength;
-
-      if (endByte <= startByte) continue;
-
-      const chunkBuffer = state.file.buffer.slice(startByte, endByte);
-
-      try {
-        const audioBuffer = await decodeAudioDataAsync(sharedAudioContext, chunkBuffer);
-        const channelData = audioBuffer.getChannelData(0);
-        const sampleRate = audioBuffer.sampleRate;
-        const windowSizeSamples = Math.floor(sampleRate * windowSec);
-
-        const chunkStartWindow = Math.floor(chunkStartSec / windowSec);
-        const chunkWindows = Math.floor(audioBuffer.duration / windowSec);
-
-        for (let w = 0; w < chunkWindows; w++) {
-          const globalIdx = chunkStartWindow + w;
-          if (globalIdx >= totalWindows) break;
-
-          const startSample = w * windowSizeSamples;
-          const endSample = Math.min(channelData.length, (w + 1) * windowSizeSamples);
-
-          let sumSquares = 0;
-          for (let s = startSample; s < endSample; s++) {
-            sumSquares += channelData[s] * channelData[s];
-          }
-
-          const count = Math.max(1, endSample - startSample);
-          const rms = Math.sqrt(sumSquares / count);
-          const db = Math.max(-60, 20 * Math.log10(rms + 1e-6));
-          peaks[globalIdx] = db;
+        if (startSample >= channelData.length) {
+          peaks[w] = -60;
+          continue;
         }
-      } catch (decodeErr) {
-        console.warn('Chunk decode error:', decodeErr);
+
+        let sumSquares = 0;
+        for (let s = startSample; s < endSample; s++) {
+          sumSquares += channelData[s] * channelData[s];
+        }
+
+        const count = Math.max(1, endSample - startSample);
+        const rms = Math.sqrt(sumSquares / count);
+        peaks[w] = Math.max(-60, 20 * Math.log10(rms + 1e-6));
       }
 
-      const progress = 50 + Math.floor(((c + 1) / totalChunks) * 50);
-      updateLoadingProgress(progress, `Analyzing audio waveform (${c + 1}/${totalChunks})...`);
+      // Memory cleanup: release audio buffer reference immediately
+      fullAudioBuffer = null;
+    } else {
+      // Chunk-based fallback for very constrained devices
+      const chunkDuration = 30;
+      const totalChunks = Math.ceil(duration / chunkDuration);
+      const frameOffsets = state.index.frameOffsets;
+      const frameDuration = state.index.frameDuration;
+
+      for (let c = 0; c < totalChunks; c++) {
+        const chunkStartSec = c * chunkDuration;
+        const chunkEndSec = Math.min(duration, (c + 1) * chunkDuration);
+
+        const startFrame = Math.floor(chunkStartSec / frameDuration);
+        const endFrame = Math.min(frameOffsets.length, Math.ceil(chunkEndSec / frameDuration));
+
+        if (startFrame >= frameOffsets.length) break;
+
+        const startByte = frameOffsets[startFrame];
+        const endByte = endFrame < frameOffsets.length ? frameOffsets[endFrame] : state.file.buffer.byteLength;
+
+        if (endByte <= startByte) continue;
+
+        try {
+          const chunkBuffer = state.file.buffer.slice(startByte, endByte);
+          const chunkAudio = await decodeAudioDataAsync(sharedAudioContext, chunkBuffer);
+          const channelData = chunkAudio.getChannelData(0);
+          const sampleRate = chunkAudio.sampleRate;
+          const windowSizeSamples = Math.floor(sampleRate * windowSec);
+
+          const chunkStartWindow = Math.floor(chunkStartSec / windowSec);
+          const chunkWindows = Math.floor(chunkAudio.duration / windowSec);
+
+          for (let w = 0; w < chunkWindows; w++) {
+            const globalIdx = chunkStartWindow + w;
+            if (globalIdx >= totalWindows) break;
+
+            const startSample = w * windowSizeSamples;
+            const endSample = Math.min(channelData.length, (w + 1) * windowSizeSamples);
+
+            let sumSquares = 0;
+            for (let s = startSample; s < endSample; s++) {
+              sumSquares += channelData[s] * channelData[s];
+            }
+
+            const count = Math.max(1, endSample - startSample);
+            const rms = Math.sqrt(sumSquares / count);
+            peaks[globalIdx] = Math.max(-60, 20 * Math.log10(rms + 1e-6));
+          }
+        } catch (chunkErr) {
+          console.warn(`Chunk ${c} decode warning:`, chunkErr);
+        }
+      }
+    }
+
+    // Auto-tune silence threshold based on noise floor analysis
+    const validPeaks = [];
+    for (let i = 0; i < peaks.length; i++) {
+      if (peaks[i] > -58) validPeaks.push(peaks[i]);
+    }
+
+    if (validPeaks.length > 50) {
+      validPeaks.sort((a, b) => a - b);
+      const p10 = validPeaks[Math.floor(validPeaks.length * 0.10)];
+      const p90 = validPeaks[Math.floor(validPeaks.length * 0.90)];
+
+      // If clear dynamic range exists, set smart threshold slightly above the 10th percentile
+      if (p90 - p10 >= 8) {
+        const smartThreshold = Math.min(-25, Math.max(-55, Math.round(p10 + 3.5)));
+        state.settings.silenceDb = smartThreshold;
+        if (elements.inputSilenceDb) {
+          elements.inputSilenceDb.value = smartThreshold;
+          elements.valSilenceDb.textContent = `${smartThreshold} dB`;
+        }
+      }
     }
 
     state.peaks = peaks;
@@ -945,6 +1004,28 @@ function drawWaveform() {
     ctx.font = '600 10px Roboto, sans-serif';
     ctx.fillText(`#${index + 1} ${part.name}`, startX + 4, 14);
   });
+
+  // Draw suggested cut lines on waveform when Auto Split dialog is open
+  if (state.ui.dialog === 'auto' && state.suggestions.length > 1) {
+    ctx.strokeStyle = isDark ? '#EFB8C8' : '#B3261E';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 3]);
+
+    for (let i = 1; i < state.suggestions.length; i++) {
+      const cutSec = state.suggestions[i].start;
+      const x = (cutSec / state.index.duration) * w;
+
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, h);
+      ctx.stroke();
+
+      ctx.fillStyle = isDark ? '#EFB8C8' : '#B3261E';
+      ctx.font = '600 9px Roboto, sans-serif';
+      ctx.fillText(`✂ ${formatTime(cutSec)}`, Math.min(w - 48, x + 3), 28);
+    }
+    ctx.setLineDash([]);
+  }
 }
 
 function initWaveformEvents() {
@@ -1012,8 +1093,8 @@ function openAutoDialog() {
 function analyzeSilence() {
   if (!state.peaks || !state.index) return;
 
-  elements.autoAnalyzingState.classList.remove('hidden');
-  elements.suggestionsList.innerHTML = '';
+  if (elements.autoAnalyzingState) elements.autoAnalyzingState.classList.remove('hidden');
+  if (elements.suggestionsList) elements.suggestionsList.innerHTML = '';
 
   const peaks = state.peaks;
   const duration = state.index.duration;
@@ -1026,47 +1107,71 @@ function analyzeSilence() {
 
   const minSilenceWindows = Math.ceil(minSilenceSec / windowSec);
 
+  // 1. Moving Average Smoothing (3-window, ~150ms) to filter out transient pops/spikes
+  const smoothed = new Float32Array(peaks.length);
+  for (let i = 0; i < peaks.length; i++) {
+    const prev = i > 0 ? peaks[i - 1] : peaks[i];
+    const curr = peaks[i];
+    const next = i < peaks.length - 1 ? peaks[i + 1] : peaks[i];
+    smoothed[i] = (prev + curr + next) / 3;
+  }
+
+  // 2. Identify silent window sequences
   const silentRanges = [];
   let inSilence = false;
-  let silenceStart = 0;
+  let silenceStartIdx = 0;
 
-  for (let i = 0; i < peaks.length; i++) {
-    if (peaks[i] <= thresholdDb) {
+  for (let i = 0; i < smoothed.length; i++) {
+    if (smoothed[i] <= thresholdDb) {
       if (!inSilence) {
         inSilence = true;
-        silenceStart = i;
+        silenceStartIdx = i;
       }
     } else {
       if (inSilence) {
         inSilence = false;
-        const silenceLen = i - silenceStart;
+        const silenceLen = i - silenceStartIdx;
         if (silenceLen >= minSilenceWindows) {
           silentRanges.push({
-            start: silenceStart * windowSec,
-            end: i * windowSec,
-            mid: ((silenceStart + i) / 2) * windowSec,
+            startIdx: silenceStartIdx,
+            endIdx: i,
           });
         }
       }
     }
   }
 
-  if (inSilence && peaks.length - silenceStart >= minSilenceWindows) {
+  if (inSilence && smoothed.length - silenceStartIdx >= minSilenceWindows) {
     silentRanges.push({
-      start: silenceStart * windowSec,
-      end: peaks.length * windowSec,
-      mid: ((silenceStart + peaks.length) / 2) * windowSec,
+      startIdx: silenceStartIdx,
+      endIdx: smoothed.length,
     });
   }
 
+  // 3. Cut points: find the deepest valley (absolute quietest frame) within each silence gap
   const cutPoints = [];
   silentRanges.forEach((range) => {
-    const snappedTime = Math.round(range.mid / frameDuration) * frameDuration;
-    if (snappedTime > 0 && snappedTime < duration) {
+    let quietestIdx = range.startIdx;
+    let minLoudness = smoothed[range.startIdx];
+
+    for (let j = range.startIdx; j < range.endIdx; j++) {
+      if (smoothed[j] < minLoudness) {
+        minLoudness = smoothed[j];
+        quietestIdx = j;
+      }
+    }
+
+    const quietestSec = quietestIdx * windowSec;
+    // Snap to exact MP3 audio frame boundary
+    const snappedTime = Math.round(quietestSec / frameDuration) * frameDuration;
+
+    // Discard cuts that are too close to start/end of file
+    if (snappedTime >= 2.0 && snappedTime <= duration - 2.0) {
       cutPoints.push(snappedTime);
     }
   });
 
+  // 4. Candidate parts between cut points
   const candidateBoundaries = [0, ...cutPoints, duration];
   let rawCandidates = [];
 
@@ -1076,6 +1181,7 @@ function analyzeSilence() {
     rawCandidates.push({ start, end });
   }
 
+  // 5. Merge candidates shorter than minPartSec
   const filteredCandidates = [];
   for (let i = 0; i < rawCandidates.length; i++) {
     const cand = rawCandidates[i];
@@ -1098,8 +1204,9 @@ function analyzeSilence() {
     };
   });
 
-  elements.autoAnalyzingState.classList.add('hidden');
+  if (elements.autoAnalyzingState) elements.autoAnalyzingState.classList.add('hidden');
   renderSuggestions();
+  drawWaveform(); // Update preview cut markers on waveform
 }
 
 function renderSuggestions() {
@@ -1704,6 +1811,7 @@ function closeDialog() {
   if (elements.rangeDialog) elements.rangeDialog.classList.remove('open');
   if (elements.iosInstallModal) elements.iosInstallModal.classList.remove('open');
   state.ui.dialog = null;
+  drawWaveform();
 }
 
 function showLoading(message) {
