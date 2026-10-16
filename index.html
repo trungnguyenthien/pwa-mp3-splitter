@@ -22,7 +22,7 @@
   <link rel="icon" type="image/png" href="./icons/favicon.png">
 
   <!-- Versioned Stylesheet adhering to pwa-standards.md -->
-  <link rel="stylesheet" href="./styles.css?v=1">
+  <link rel="stylesheet" href="./styles.css?v=3">
 </head>
 <body>
 
@@ -63,9 +63,9 @@
 
     <!-- Card 1: File Picker / File Info -->
     <section class="card" id="filePickerCard">
-      <!-- Empty Dropzone State -->
-      <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Click or drop MP3 file here">
-        <input type="file" id="fileInput" accept="audio/mpeg,.mp3" class="hidden">
+      <!-- Empty Dropzone State (using native label for 100% reliable click activation) -->
+      <label for="fileInput" id="dropzone" class="dropzone" tabindex="0" aria-label="Click or drop MP3 file here">
+        <input type="file" id="fileInput" accept="audio/mpeg,.mp3,audio/*" class="visually-hidden">
         <div class="dropzone-icon">
           <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M9 18V5l12-2v13"/>
@@ -75,15 +75,15 @@
         </div>
         <h2 class="dropzone-title">Choose or Drop an MP3 File</h2>
         <p class="dropzone-subtitle">Lossless split without re-encoding. Works completely offline on your device, up to ~100 MB.</p>
-        <button type="button" class="btn btn-primary" id="btnChooseFile">
+        <span class="btn btn-primary" id="btnChooseFile">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
             <polyline points="17 8 12 3 7 8"/>
             <line x1="12" y1="3" x2="12" y2="15"/>
           </svg>
           <span>Choose MP3 File</span>
-        </button>
-      </div>
+        </span>
+      </label>
 
       <!-- Loaded File Details (hidden initially) -->
       <div id="fileInfoSection" class="hidden">
@@ -101,7 +101,7 @@
               <div id="fileSubtext" class="form-helper">Indexed & ready to split</div>
             </div>
           </div>
-          <button id="btnChangeFile" class="btn btn-text btn-sm" aria-label="Change current file">Change file</button>
+          <label for="fileInput" id="btnChangeFile" class="btn btn-text btn-sm" aria-label="Change current file" style="cursor: pointer;">Change file</label>
         </div>
 
         <div class="file-stats-row">
@@ -171,18 +171,18 @@
     <!-- Card 3: Add Part Action Row -->
     <section class="action-row">
       <button id="btnOpenAuto" class="btn btn-tonal" disabled>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="m12 3-1.9 5.8a2 2 0 0 1-1.3 1.3L3 12l5.8 1.9a2 2 0 0 1 1.3 1.3L12 21l1.9-5.8a2 2 0 0 1 1.3-1.3L21 12l-5.8-1.9a2 2 0 0 1-1.3-1.3Z"/>
         </svg>
-        <span>Auto Split (Silence)</span>
+        <span>Auto split</span>
       </button>
 
       <button id="btnOpenRange" class="btn btn-outlined" disabled>
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="10"/>
           <polyline points="12 6 12 12 16 14"/>
         </svg>
-        <span>Time Range</span>
+        <span>Time range</span>
       </button>
     </section>
 
@@ -385,6 +385,6 @@
   </div>
 
   <!-- Application Logic with Cache-Busting adhering to pwa-standards.md -->
-  <script type="module" src="./app.js?v=1"></script>
+  <script defer src="./app.js?v=3"></script>
 </body>
 </html>

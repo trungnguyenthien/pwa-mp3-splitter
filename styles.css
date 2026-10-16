@@ -592,7 +592,11 @@ body {
 
 .action-row .btn {
   flex: 1;
-  min-height: 48px;
+  min-height: 44px;
+  font-size: 0.875rem;
+  padding: 0 16px;
+  white-space: nowrap;
+  letter-spacing: 0.01em;
 }
 
 /* Parts List Card */
@@ -1041,6 +1045,21 @@ body {
 /* Hidden Utility */
 .hidden {
   display: none !important;
+}
+
+/* Visually hidden for accessible file input (never blocked by browser) */
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 
 /* Reduced Motion */

@@ -5,6 +5,18 @@
  */
 
 // =============================================================================
+// MP3 Constants & Parsing Logic (Used directly or in Worker)
+// =============================================================================
+const BITRATES_MPEG1_L3 = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0];
+const BITRATES_MPEG2_L3 = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0];
+
+const SAMPLERATES = {
+  3: [44100, 48000, 32000], // MPEG 1
+  2: [22050, 24000, 16000], // MPEG 2
+  0: [11025, 12000, 8000],  // MPEG 2.5
+};
+
+// =============================================================================
 // Application State (Single Source of Truth)
 // =============================================================================
 const state = {
@@ -32,130 +44,145 @@ const state = {
   wakeLock: null,
 };
 
-// Worker instance
 let mp3Worker = null;
 let sharedAudioContext = null;
-
-// DOM Elements
-const elements = {
-  // Top bar
-  btnInstall: document.getElementById('btnInstall'),
-  offlineChip: document.getElementById('offlineChip'),
-
-  // Dropzone / File Picker
-  dropzone: document.getElementById('dropzone'),
-  fileInput: document.getElementById('fileInput'),
-  btnChooseFile: document.getElementById('btnChooseFile'),
-  fileInfoSection: document.getElementById('fileInfoSection'),
-  btnChangeFile: document.getElementById('btnChangeFile'),
-  fileNameDisplay: document.getElementById('fileNameDisplay'),
-  statDuration: document.getElementById('statDuration'),
-  statBitrate: document.getElementById('statBitrate'),
-  statSampleRate: document.getElementById('statSampleRate'),
-  statSize: document.getElementById('statSize'),
-
-  // Loading
-  loadingSection: document.getElementById('loadingSection'),
-  loadingMessage: document.getElementById('loadingMessage'),
-  loadingPercent: document.getElementById('loadingPercent'),
-  loadingProgressBar: document.getElementById('loadingProgressBar'),
-
-  // Waveform
-  waveformCard: document.getElementById('waveformCard'),
-  waveformCanvas: document.getElementById('waveformCanvas'),
-  canvasWrapper: document.getElementById('canvasWrapper'),
-  waveformHoverBar: document.getElementById('waveformHoverBar'),
-  waveformHoverLabel: document.getElementById('waveformHoverLabel'),
-  waveformPlayhead: document.getElementById('waveformPlayhead'),
-  btnPlayWholeFile: document.getElementById('btnPlayWholeFile'),
-  playIcon: document.getElementById('playIcon'),
-  pauseIcon: document.getElementById('pauseIcon'),
-  currentTimeDisplay: document.getElementById('currentTimeDisplay'),
-  totalTimeDisplay: document.getElementById('totalTimeDisplay'),
-
-  // Action Buttons
-  btnOpenAuto: document.getElementById('btnOpenAuto'),
-  btnOpenRange: document.getElementById('btnOpenRange'),
-
-  // Parts List
-  partsCard: document.getElementById('partsCard'),
-  partsCardTitle: document.getElementById('partsCardTitle'),
-  partsEmptyState: document.getElementById('partsEmptyState'),
-  partsList: document.getElementById('partsList'),
-  btnClearAllParts: document.getElementById('btnClearAllParts'),
-
-  // Auto Split Dialog
-  autoSplitDialog: document.getElementById('autoSplitDialog'),
-  btnCloseAutoDialog: document.getElementById('btnCloseAutoDialog'),
-  btnCancelAuto: document.getElementById('btnCancelAuto'),
-  btnAddSelectedAuto: document.getElementById('btnAddSelectedAuto'),
-  btnSelectAllSuggestions: document.getElementById('btnSelectAllSuggestions'),
-  btnClearSuggestions: document.getElementById('btnClearSuggestions'),
-  suggestionsList: document.getElementById('suggestionsList'),
-  detectedCountLabel: document.getElementById('detectedCountLabel'),
-  autoAnalyzingState: document.getElementById('autoAnalyzingState'),
-  autoProgressBar: document.getElementById('autoProgressBar'),
-
-  // Advanced settings in Auto dialog
-  settingsAccordion: document.getElementById('settingsAccordion'),
-  btnToggleSettings: document.getElementById('btnToggleSettings'),
-  inputSilenceDb: document.getElementById('inputSilenceDb'),
-  valSilenceDb: document.getElementById('valSilenceDb'),
-  inputMinSilence: document.getElementById('inputMinSilence'),
-  valMinSilence: document.getElementById('valMinSilence'),
-  inputMinPart: document.getElementById('inputMinPart'),
-  valMinPart: document.getElementById('valMinPart'),
-  btnReanalyze: document.getElementById('btnReanalyze'),
-
-  // Time Range Dialog
-  rangeDialog: document.getElementById('rangeDialog'),
-  btnCloseRangeDialog: document.getElementById('btnCloseRangeDialog'),
-  btnCancelRange: document.getElementById('btnCancelRange'),
-  btnAddPartRange: document.getElementById('btnAddPartRange'),
-  inputRangeStart: document.getElementById('inputRangeStart'),
-  inputRangeEnd: document.getElementById('inputRangeEnd'),
-  rangeStartHelper: document.getElementById('rangeStartHelper'),
-  rangeEndHelper: document.getElementById('rangeEndHelper'),
-  rangeErrorAlert: document.getElementById('rangeErrorAlert'),
-  chipStartFromZero: document.getElementById('chipStartFromZero'),
-  chipEndAtTotal: document.getElementById('chipEndAtTotal'),
-
-  // iOS Install Modal
-  iosInstallModal: document.getElementById('iosInstallModal'),
-  btnCloseIosModal: document.getElementById('btnCloseIosModal'),
-  btnGotItIos: document.getElementById('btnGotItIos'),
-
-  // Audio & Toast
-  previewAudio: document.getElementById('previewAudio'),
-  snackbar: document.getElementById('snackbar'),
-  snackbarText: document.getElementById('snackbarText'),
-  snackbarAction: document.getElementById('snackbarAction'),
-};
+let elements = {};
 
 // =============================================================================
-// Initialization
+// Bootstrap Entry Point
 // =============================================================================
-window.addEventListener('DOMContentLoaded', () => {
-  initWorker();
+function bootstrap() {
+  initElements();
+  initEvents(); // Register all UI listeners immediately
+  initWorker(); // Initialize worker with safe fallback
   initServiceWorker();
-  initEvents();
   initCanvasResize();
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', bootstrap);
+} else {
+  bootstrap();
+}
 
 // =============================================================================
-// Web Worker Lifecycle
+// Cache DOM Elements
+// =============================================================================
+function initElements() {
+  elements = {
+    // Top bar
+    btnInstall: document.getElementById('btnInstall'),
+    offlineChip: document.getElementById('offlineChip'),
+
+    // Dropzone / File Picker
+    dropzone: document.getElementById('dropzone'),
+    fileInput: document.getElementById('fileInput'),
+    btnChooseFile: document.getElementById('btnChooseFile'),
+    fileInfoSection: document.getElementById('fileInfoSection'),
+    btnChangeFile: document.getElementById('btnChangeFile'),
+    fileNameDisplay: document.getElementById('fileNameDisplay'),
+    statDuration: document.getElementById('statDuration'),
+    statBitrate: document.getElementById('statBitrate'),
+    statSampleRate: document.getElementById('statSampleRate'),
+    statSize: document.getElementById('statSize'),
+
+    // Loading
+    loadingSection: document.getElementById('loadingSection'),
+    loadingMessage: document.getElementById('loadingMessage'),
+    loadingPercent: document.getElementById('loadingPercent'),
+    loadingProgressBar: document.getElementById('loadingProgressBar'),
+
+    // Waveform
+    waveformCard: document.getElementById('waveformCard'),
+    waveformCanvas: document.getElementById('waveformCanvas'),
+    canvasWrapper: document.getElementById('canvasWrapper'),
+    waveformHoverBar: document.getElementById('waveformHoverBar'),
+    waveformHoverLabel: document.getElementById('waveformHoverLabel'),
+    waveformPlayhead: document.getElementById('waveformPlayhead'),
+    btnPlayWholeFile: document.getElementById('btnPlayWholeFile'),
+    playIcon: document.getElementById('playIcon'),
+    pauseIcon: document.getElementById('pauseIcon'),
+    currentTimeDisplay: document.getElementById('currentTimeDisplay'),
+    totalTimeDisplay: document.getElementById('totalTimeDisplay'),
+
+    // Action Buttons
+    btnOpenAuto: document.getElementById('btnOpenAuto'),
+    btnOpenRange: document.getElementById('btnOpenRange'),
+
+    // Parts List
+    partsCard: document.getElementById('partsCard'),
+    partsCardTitle: document.getElementById('partsCardTitle'),
+    partsEmptyState: document.getElementById('partsEmptyState'),
+    partsList: document.getElementById('partsList'),
+    btnClearAllParts: document.getElementById('btnClearAllParts'),
+
+    // Auto Split Dialog
+    autoSplitDialog: document.getElementById('autoSplitDialog'),
+    btnCloseAutoDialog: document.getElementById('btnCloseAutoDialog'),
+    btnCancelAuto: document.getElementById('btnCancelAuto'),
+    btnAddSelectedAuto: document.getElementById('btnAddSelectedAuto'),
+    btnSelectAllSuggestions: document.getElementById('btnSelectAllSuggestions'),
+    btnClearSuggestions: document.getElementById('btnClearSuggestions'),
+    suggestionsList: document.getElementById('suggestionsList'),
+    detectedCountLabel: document.getElementById('detectedCountLabel'),
+    autoAnalyzingState: document.getElementById('autoAnalyzingState'),
+    autoProgressBar: document.getElementById('autoProgressBar'),
+
+    // Advanced settings in Auto dialog
+    settingsAccordion: document.getElementById('settingsAccordion'),
+    btnToggleSettings: document.getElementById('btnToggleSettings'),
+    inputSilenceDb: document.getElementById('inputSilenceDb'),
+    valSilenceDb: document.getElementById('valSilenceDb'),
+    inputMinSilence: document.getElementById('inputMinSilence'),
+    valMinSilence: document.getElementById('valMinSilence'),
+    inputMinPart: document.getElementById('inputMinPart'),
+    valMinPart: document.getElementById('valMinPart'),
+    btnReanalyze: document.getElementById('btnReanalyze'),
+
+    // Time Range Dialog
+    rangeDialog: document.getElementById('rangeDialog'),
+    btnCloseRangeDialog: document.getElementById('btnCloseRangeDialog'),
+    btnCancelRange: document.getElementById('btnCancelRange'),
+    btnAddPartRange: document.getElementById('btnAddPartRange'),
+    inputRangeStart: document.getElementById('inputRangeStart'),
+    inputRangeEnd: document.getElementById('inputRangeEnd'),
+    rangeStartHelper: document.getElementById('rangeStartHelper'),
+    rangeEndHelper: document.getElementById('rangeEndHelper'),
+    rangeErrorAlert: document.getElementById('rangeErrorAlert'),
+    chipStartFromZero: document.getElementById('chipStartFromZero'),
+    chipEndAtTotal: document.getElementById('chipEndAtTotal'),
+
+    // iOS Install Modal
+    iosInstallModal: document.getElementById('iosInstallModal'),
+    btnCloseIosModal: document.getElementById('btnCloseIosModal'),
+    btnGotItIos: document.getElementById('btnGotItIos'),
+
+    // Audio & Toast
+    previewAudio: document.getElementById('previewAudio'),
+    snackbar: document.getElementById('snackbar'),
+    snackbarText: document.getElementById('snackbarText'),
+    snackbarAction: document.getElementById('snackbarAction'),
+  };
+}
+
+// =============================================================================
+// Web Worker Initialization (with In-Thread Fallback for file:// or restricted environments)
 // =============================================================================
 function initWorker() {
-  if (window.Worker) {
-    mp3Worker = new Worker('./mp3-worker.js?v=1');
-    mp3Worker.onmessage = handleWorkerMessage;
-    mp3Worker.onerror = (err) => {
-      console.error('Worker error:', err);
-      showSnackbar('Worker processing error: ' + (err.message || 'Unknown error'));
-      hideLoading();
-    };
-  } else {
-    showSnackbar('Your browser does not support Web Workers.');
+  try {
+    if (window.Worker && window.location.protocol !== 'file:') {
+      mp3Worker = new Worker('./mp3-worker.js?v=3');
+      mp3Worker.onmessage = handleWorkerMessage;
+      mp3Worker.onerror = (err) => {
+        console.warn('Worker error, switching to in-thread processing:', err);
+        mp3Worker = null;
+      };
+    } else {
+      mp3Worker = null;
+    }
+  } catch (err) {
+    console.warn('Worker initialization caught error, using in-thread processor:', err);
+    mp3Worker = null;
   }
 }
 
@@ -178,13 +205,12 @@ function handleWorkerMessage(event) {
 // Service Worker Registration & PWA Standards
 // =============================================================================
 function initServiceWorker() {
-  if ('serviceWorker' in navigator) {
+  if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
     navigator.serviceWorker
       .register('./sw.js', { scope: './' })
       .then((reg) => {
-        // If activated, show offline ready chip
         if (reg.active) {
-          elements.offlineChip.classList.remove('hidden');
+          if (elements.offlineChip) elements.offlineChip.classList.remove('hidden');
         }
 
         reg.addEventListener('updatefound', () => {
@@ -197,14 +223,14 @@ function initServiceWorker() {
                   window.location.reload();
                 });
               } else if (newWorker.state === 'activated') {
-                elements.offlineChip.classList.remove('hidden');
+                if (elements.offlineChip) elements.offlineChip.classList.remove('hidden');
               }
             });
           }
         });
       })
       .catch((err) => {
-        console.warn('Service Worker registration failed:', err);
+        console.warn('Service Worker registration skipped or failed:', err);
       });
   }
 
@@ -212,12 +238,12 @@ function initServiceWorker() {
   window.addEventListener('beforeinstallprompt', (e) => {
     e.preventDefault();
     state.deferredInstallPrompt = e;
-    elements.btnInstall.classList.remove('hidden');
+    if (elements.btnInstall) elements.btnInstall.classList.remove('hidden');
   });
 
   window.addEventListener('appinstalled', () => {
     state.deferredInstallPrompt = null;
-    elements.btnInstall.classList.add('hidden');
+    if (elements.btnInstall) elements.btnInstall.classList.add('hidden');
     showSnackbar('MP3 Splitter installed successfully!');
   });
 }
@@ -226,146 +252,180 @@ function initServiceWorker() {
 // Event Handlers Setup
 // =============================================================================
 function initEvents() {
-  // File Picker
-  elements.btnChooseFile.addEventListener('click', (e) => {
-    e.stopPropagation();
-    elements.fileInput.click();
-  });
+  // File input change
+  if (elements.fileInput) {
+    elements.fileInput.addEventListener('change', handleFileSelected);
+  }
 
-  elements.dropzone.addEventListener('click', () => {
-    elements.fileInput.click();
-  });
+  // Keyboard accessibility on dropzone (Space or Enter opens picker)
+  if (elements.dropzone) {
+    elements.dropzone.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        if (elements.fileInput) elements.fileInput.click();
+      }
+    });
 
-  elements.btnChangeFile.addEventListener('click', () => {
-    elements.fileInput.value = '';
-    elements.fileInput.click();
-  });
+    // Drag and drop events
+    elements.dropzone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      elements.dropzone.classList.add('drag-over');
+    });
 
-  elements.fileInput.addEventListener('change', handleFileSelected);
+    elements.dropzone.addEventListener('dragleave', () => {
+      elements.dropzone.classList.remove('drag-over');
+    });
 
-  // Drag and drop
-  elements.dropzone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    elements.dropzone.classList.add('drag-over');
-  });
+    elements.dropzone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      elements.dropzone.classList.remove('drag-over');
+      if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        processSelectedFile(e.dataTransfer.files[0]);
+      }
+    });
+  }
 
-  elements.dropzone.addEventListener('dragleave', () => {
-    elements.dropzone.classList.remove('drag-over');
-  });
-
-  elements.dropzone.addEventListener('drop', (e) => {
-    e.preventDefault();
-    elements.dropzone.classList.remove('drag-over');
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      processSelectedFile(e.dataTransfer.files[0]);
-    }
-  });
+  // Change file button
+  if (elements.btnChangeFile) {
+    elements.btnChangeFile.addEventListener('click', () => {
+      if (elements.fileInput) {
+        elements.fileInput.value = '';
+        elements.fileInput.click();
+      }
+    });
+  }
 
   // Install button
-  elements.btnInstall.addEventListener('click', handleInstallClick);
-  elements.btnCloseIosModal.addEventListener('click', () => closeDialog());
-  elements.btnGotItIos.addEventListener('click', () => closeDialog());
+  if (elements.btnInstall) {
+    elements.btnInstall.addEventListener('click', handleInstallClick);
+  }
+  if (elements.btnCloseIosModal) {
+    elements.btnCloseIosModal.addEventListener('click', () => closeDialog());
+  }
+  if (elements.btnGotItIos) {
+    elements.btnGotItIos.addEventListener('click', () => closeDialog());
+  }
 
   // Waveform canvas interactions
   initWaveformEvents();
 
   // Dialog triggers
-  elements.btnOpenAuto.addEventListener('click', openAutoDialog);
-  elements.btnOpenRange.addEventListener('click', openRangeDialog);
+  if (elements.btnOpenAuto) elements.btnOpenAuto.addEventListener('click', openAutoDialog);
+  if (elements.btnOpenRange) elements.btnOpenRange.addEventListener('click', openRangeDialog);
 
   // Auto Dialog actions
-  elements.btnCloseAutoDialog.addEventListener('click', () => closeDialog());
-  elements.btnCancelAuto.addEventListener('click', () => closeDialog());
-  elements.btnSelectAllSuggestions.addEventListener('click', () => setAllSuggestionsSelected(true));
-  elements.btnClearSuggestions.addEventListener('click', () => setAllSuggestionsSelected(false));
-  elements.btnAddSelectedAuto.addEventListener('click', addSelectedSuggestions);
+  if (elements.btnCloseAutoDialog) elements.btnCloseAutoDialog.addEventListener('click', () => closeDialog());
+  if (elements.btnCancelAuto) elements.btnCancelAuto.addEventListener('click', () => closeDialog());
+  if (elements.btnSelectAllSuggestions) elements.btnSelectAllSuggestions.addEventListener('click', () => setAllSuggestionsSelected(true));
+  if (elements.btnClearSuggestions) elements.btnClearSuggestions.addEventListener('click', () => setAllSuggestionsSelected(false));
+  if (elements.btnAddSelectedAuto) elements.btnAddSelectedAuto.addEventListener('click', addSelectedSuggestions);
 
   // Accordion toggle
-  elements.btnToggleSettings.addEventListener('click', () => {
-    elements.settingsAccordion.classList.toggle('open');
-  });
+  if (elements.btnToggleSettings) {
+    elements.btnToggleSettings.addEventListener('click', () => {
+      elements.settingsAccordion.classList.toggle('open');
+    });
+  }
 
   // Settings sliders
-  elements.inputSilenceDb.addEventListener('input', (e) => {
-    state.settings.silenceDb = parseFloat(e.target.value);
-    elements.valSilenceDb.textContent = `${state.settings.silenceDb} dB`;
-  });
+  if (elements.inputSilenceDb) {
+    elements.inputSilenceDb.addEventListener('input', (e) => {
+      state.settings.silenceDb = parseFloat(e.target.value);
+      elements.valSilenceDb.textContent = `${state.settings.silenceDb} dB`;
+    });
+  }
 
-  elements.inputMinSilence.addEventListener('input', (e) => {
-    state.settings.minSilenceSec = parseFloat(e.target.value);
-    elements.valMinSilence.textContent = `${state.settings.minSilenceSec}s`;
-  });
+  if (elements.inputMinSilence) {
+    elements.inputMinSilence.addEventListener('input', (e) => {
+      state.settings.minSilenceSec = parseFloat(e.target.value);
+      elements.valMinSilence.textContent = `${state.settings.minSilenceSec}s`;
+    });
+  }
 
-  elements.inputMinPart.addEventListener('input', (e) => {
-    state.settings.minPartSec = parseFloat(e.target.value);
-    elements.valMinPart.textContent = `${state.settings.minPartSec}s`;
-  });
+  if (elements.inputMinPart) {
+    elements.inputMinPart.addEventListener('input', (e) => {
+      state.settings.minPartSec = parseFloat(e.target.value);
+      elements.valMinPart.textContent = `${state.settings.minPartSec}s`;
+    });
+  }
 
-  elements.btnReanalyze.addEventListener('click', () => {
-    analyzeSilence();
-  });
+  if (elements.btnReanalyze) {
+    elements.btnReanalyze.addEventListener('click', () => {
+      analyzeSilence();
+    });
+  }
 
   // Range Dialog actions
-  elements.btnCloseRangeDialog.addEventListener('click', () => closeDialog());
-  elements.btnCancelRange.addEventListener('click', () => closeDialog());
-  elements.btnAddPartRange.addEventListener('click', addRangePart);
-  elements.inputRangeStart.addEventListener('input', validateRangeInputs);
-  elements.inputRangeEnd.addEventListener('input', validateRangeInputs);
+  if (elements.btnCloseRangeDialog) elements.btnCloseRangeDialog.addEventListener('click', () => closeDialog());
+  if (elements.btnCancelRange) elements.btnCancelRange.addEventListener('click', () => closeDialog());
+  if (elements.btnAddPartRange) elements.btnAddPartRange.addEventListener('click', addRangePart);
+  if (elements.inputRangeStart) elements.inputRangeStart.addEventListener('input', validateRangeInputs);
+  if (elements.inputRangeEnd) elements.inputRangeEnd.addEventListener('input', validateRangeInputs);
 
-  elements.chipStartFromZero.addEventListener('click', () => {
-    elements.inputRangeStart.value = '0';
-    validateRangeInputs();
-  });
-
-  elements.chipEndAtTotal.addEventListener('click', () => {
-    if (state.index) {
-      elements.inputRangeEnd.value = state.index.duration.toFixed(2);
+  if (elements.chipStartFromZero) {
+    elements.chipStartFromZero.addEventListener('click', () => {
+      elements.inputRangeStart.value = '0';
       validateRangeInputs();
-    }
-  });
+    });
+  }
+
+  if (elements.chipEndAtTotal) {
+    elements.chipEndAtTotal.addEventListener('click', () => {
+      if (state.index) {
+        elements.inputRangeEnd.value = state.index.duration.toFixed(2);
+        validateRangeInputs();
+      }
+    });
+  }
 
   // Parts List actions
-  elements.btnClearAllParts.addEventListener('click', () => {
-    if (state.parts.length === 0) return;
-    if (confirm('Clear all parts from the list?')) {
-      state.parts = [];
-      renderParts();
-      drawWaveform();
-      showSnackbar('All parts cleared.');
-    }
-  });
+  if (elements.btnClearAllParts) {
+    elements.btnClearAllParts.addEventListener('click', () => {
+      if (state.parts.length === 0) return;
+      if (confirm('Clear all parts from the list?')) {
+        state.parts = [];
+        renderParts();
+        drawWaveform();
+        showSnackbar('All parts cleared.');
+      }
+    });
+  }
 
   // Shared Preview Audio events
-  elements.previewAudio.addEventListener('timeupdate', () => {
-    if (state.ui.previewId === 'whole') {
-      state.ui.currentTime = elements.previewAudio.currentTime;
-      updatePlayheadPosition();
-      elements.currentTimeDisplay.textContent = formatTime(state.ui.currentTime);
-    }
-  });
+  if (elements.previewAudio) {
+    elements.previewAudio.addEventListener('timeupdate', () => {
+      if (state.ui.previewId === 'whole') {
+        state.ui.currentTime = elements.previewAudio.currentTime;
+        updatePlayheadPosition();
+        elements.currentTimeDisplay.textContent = formatTime(state.ui.currentTime);
+      }
+    });
 
-  elements.previewAudio.addEventListener('ended', () => {
-    stopPreview();
-  });
+    elements.previewAudio.addEventListener('ended', () => {
+      stopPreview();
+    });
 
-  elements.previewAudio.addEventListener('pause', () => {
-    if (state.ui.previewId === 'whole') {
-      state.ui.isWholePlaying = false;
-      elements.playIcon.classList.remove('hidden');
-      elements.pauseIcon.classList.add('hidden');
-    }
-  });
+    elements.previewAudio.addEventListener('pause', () => {
+      if (state.ui.previewId === 'whole') {
+        state.ui.isWholePlaying = false;
+        elements.playIcon.classList.remove('hidden');
+        elements.pauseIcon.classList.add('hidden');
+      }
+    });
 
-  elements.previewAudio.addEventListener('play', () => {
-    if (state.ui.previewId === 'whole') {
-      state.ui.isWholePlaying = true;
-      elements.playIcon.classList.add('hidden');
-      elements.pauseIcon.classList.remove('hidden');
-    }
-  });
+    elements.previewAudio.addEventListener('play', () => {
+      if (state.ui.previewId === 'whole') {
+        state.ui.isWholePlaying = true;
+        elements.playIcon.classList.add('hidden');
+        elements.pauseIcon.classList.remove('hidden');
+      }
+    });
+  }
 
   // Play/Pause whole file
-  elements.btnPlayWholeFile.addEventListener('click', togglePlayWholeFile);
+  if (elements.btnPlayWholeFile) {
+    elements.btnPlayWholeFile.addEventListener('click', togglePlayWholeFile);
+  }
 
   // Close dialog on backdrop click or ESC key
   window.addEventListener('keydown', (e) => {
@@ -375,11 +435,13 @@ function initEvents() {
   });
 
   [elements.autoSplitDialog, elements.rangeDialog, elements.iosInstallModal].forEach((backdrop) => {
-    backdrop.addEventListener('click', (e) => {
-      if (e.target === backdrop) {
-        closeDialog();
-      }
-    });
+    if (backdrop) {
+      backdrop.addEventListener('click', (e) => {
+        if (e.target === backdrop) {
+          closeDialog();
+        }
+      });
+    }
   });
 }
 
@@ -393,18 +455,17 @@ function handleFileSelected(event) {
 }
 
 async function processSelectedFile(file) {
-  // Check extension or MIME type
   const isMp3 =
     file.name.toLowerCase().endsWith('.mp3') ||
     file.type === 'audio/mpeg' ||
-    file.type === 'audio/mp3';
+    file.type === 'audio/mp3' ||
+    file.type.includes('audio');
 
   if (!isMp3) {
     showSnackbar('Selected file is not recognized as an MP3 audio file.');
     return;
   }
 
-  // Warn if file > 100 MB
   if (file.size > 100 * 1024 * 1024) {
     const proceed = confirm(
       'This file is larger than 100 MB. Processing might take a moment on mobile devices. Continue?'
@@ -412,10 +473,8 @@ async function processSelectedFile(file) {
     if (!proceed) return;
   }
 
-  // Stop any active preview
   stopPreview();
 
-  // Reset state
   state.file = {
     name: file.name,
     size: file.size,
@@ -434,20 +493,38 @@ async function processSelectedFile(file) {
 
   try {
     const arrayBuffer = await file.arrayBuffer();
-    // Keep a copy in memory for slicing and send a copy to worker
     state.file.buffer = arrayBuffer;
 
-    updateLoadingProgress(10, 'Indexing audio frames in worker...');
+    updateLoadingProgress(10, 'Indexing audio frames...');
 
-    // Post to worker (transfer a cloned slice so main thread keeps state.file.buffer)
-    const workerBuffer = arrayBuffer.slice(0);
-    mp3Worker.postMessage(
-      {
-        action: 'indexMp3',
-        payload: { buffer: workerBuffer },
-      },
-      [workerBuffer]
-    );
+    if (mp3Worker) {
+      try {
+        const workerBuffer = arrayBuffer.slice(0);
+        mp3Worker.postMessage(
+          {
+            action: 'indexMp3',
+            payload: { buffer: workerBuffer },
+          },
+          [workerBuffer]
+        );
+        return;
+      } catch (workerErr) {
+        console.warn('Worker postMessage failed, falling back to in-thread:', workerErr);
+      }
+    }
+
+    // In-thread fallback
+    setTimeout(() => {
+      try {
+        const indexResult = parseMp3IndexDirect(state.file.buffer, (progress) => {
+          updateLoadingProgress(progress, 'Indexing audio frames...');
+        });
+        onIndexComplete(indexResult);
+      } catch (err) {
+        hideLoading();
+        showSnackbar('Error reading MP3: ' + err.message);
+      }
+    }, 50);
   } catch (err) {
     console.error('File read error:', err);
     hideLoading();
@@ -458,7 +535,6 @@ async function processSelectedFile(file) {
 function onIndexComplete(index) {
   state.index = index;
 
-  // Update UI stats
   elements.fileNameDisplay.textContent = state.file.name;
   elements.statDuration.textContent = formatTime(index.duration);
   elements.statBitrate.textContent = `${index.bitrate} kbps ${index.isVbr ? '(VBR)' : '(CBR)'}`;
@@ -467,7 +543,6 @@ function onIndexComplete(index) {
   elements.totalTimeDisplay.textContent = formatTime(index.duration);
   elements.currentTimeDisplay.textContent = '00:00.0';
 
-  // Show file info card & hide empty dropzone
   elements.dropzone.classList.add('hidden');
   elements.fileInfoSection.classList.remove('hidden');
   elements.waveformCard.classList.remove('hidden');
@@ -475,9 +550,216 @@ function onIndexComplete(index) {
   enableActionButtons();
 
   updateLoadingProgress(50, 'Analyzing audio waveform...');
-
-  // Start Peak / Loudness Analysis for waveform and silence detection
   computePeaks();
+}
+
+// =============================================================================
+// In-Thread MP3 Indexing & Slicing Engine (Guarantees 100% Offline & File:// Support)
+// =============================================================================
+function parseMp3IndexDirect(buffer, onProgress) {
+  const bytes = new Uint8Array(buffer);
+  const totalLength = bytes.length;
+
+  let offset = 0;
+  if (
+    totalLength >= 10 &&
+    bytes[0] === 0x49 &&
+    bytes[1] === 0x44 &&
+    bytes[2] === 0x33
+  ) {
+    const flags = bytes[5];
+    const synchsafeSize =
+      ((bytes[6] & 0x7f) << 21) |
+      ((bytes[7] & 0x7f) << 14) |
+      ((bytes[8] & 0x7f) << 7) |
+      (bytes[9] & 0x7f);
+    const hasFooter = (flags & 0x10) !== 0;
+    offset = Math.min(10 + synchsafeSize + (hasFooter ? 10 : 0), totalLength);
+  }
+
+  let capacity = 32768;
+  let frameOffsets = new Uint32Array(capacity);
+  let frameCount = 0;
+
+  let firstValidFrameHeader = null;
+  let firstAudioFrameIndex = 0;
+  let hasXingHeader = false;
+  let detectedBitrateSum = 0;
+  let detectedBitrates = new Set();
+  let lastProgress = -1;
+
+  while (offset + 4 <= totalLength) {
+    if (
+      offset + 128 === totalLength &&
+      bytes[offset] === 0x54 &&
+      bytes[offset + 1] === 0x41 &&
+      bytes[offset + 2] === 0x47
+    ) {
+      break;
+    }
+
+    const b0 = bytes[offset];
+    const b1 = bytes[offset + 1];
+
+    if (b0 === 0xff && (b1 & 0xe0) === 0xe0) {
+      const b2 = bytes[offset + 2];
+      const b3 = bytes[offset + 3];
+
+      const mpegVersion = (b1 >> 3) & 0x03;
+      const layer = (b1 >> 1) & 0x03;
+      const protection = b1 & 0x01;
+      const bitrateIdx = (b2 >> 4) & 0x0f;
+      const sampleRateIdx = (b2 >> 2) & 0x03;
+      const padding = (b2 >> 1) & 0x01;
+      const channelMode = (b3 >> 6) & 0x03;
+
+      if (
+        mpegVersion !== 1 &&
+        layer === 1 &&
+        bitrateIdx > 0 &&
+        bitrateIdx < 15 &&
+        sampleRateIdx < 3
+      ) {
+        const bitrates = mpegVersion === 3 ? BITRATES_MPEG1_L3 : BITRATES_MPEG2_L3;
+        const bitrateKbps = bitrates[bitrateIdx];
+        const sampleRate = SAMPLERATES[mpegVersion][sampleRateIdx];
+
+        let frameLength =
+          mpegVersion === 3
+            ? Math.floor((144 * bitrateKbps * 1000) / sampleRate) + padding
+            : Math.floor((72 * bitrateKbps * 1000) / sampleRate) + padding;
+
+        if (frameLength >= 4 && offset + frameLength <= totalLength) {
+          if (frameCount === 0) {
+            firstValidFrameHeader = {
+              mpegVersion,
+              sampleRate,
+              samplesPerFrame: mpegVersion === 3 ? 1152 : 576,
+              channelMode,
+            };
+
+            const sideInfoLen = mpegVersion === 3 ? (channelMode === 3 ? 17 : 32) : (channelMode === 3 ? 9 : 17);
+            const xingOffset = offset + 4 + (protection === 0 ? 2 : 0) + sideInfoLen;
+
+            if (xingOffset + 4 <= totalLength) {
+              const x0 = bytes[xingOffset];
+              const x1 = bytes[xingOffset + 1];
+              const x2 = bytes[xingOffset + 2];
+              const x3 = bytes[xingOffset + 3];
+              if (
+                (x0 === 0x58 && x1 === 0x69 && x2 === 0x6e && x3 === 0x67) ||
+                (x0 === 0x49 && x1 === 0x6e && x2 === 0x66 && x3 === 0x6f)
+              ) {
+                hasXingHeader = true;
+              }
+            }
+          }
+
+          if (frameCount >= capacity) {
+            capacity *= 2;
+            const newOffsets = new Uint32Array(capacity);
+            newOffsets.set(frameOffsets);
+            frameOffsets = newOffsets;
+          }
+
+          frameOffsets[frameCount] = offset;
+          frameCount++;
+
+          detectedBitrates.add(bitrateKbps);
+          detectedBitrateSum += bitrateKbps;
+          offset += frameLength;
+
+          const prog = Math.floor((offset / totalLength) * 100);
+          if (prog !== lastProgress && prog % 10 === 0) {
+            lastProgress = prog;
+            if (onProgress) onProgress(prog);
+          }
+          continue;
+        }
+      }
+    }
+    offset++;
+  }
+
+  if (frameCount === 0 || !firstValidFrameHeader) {
+    throw new Error('No valid MP3 audio frames found in file.');
+  }
+
+  const trimmedOffsets = frameOffsets.subarray(0, frameCount);
+  if (hasXingHeader && frameCount > 1) {
+    firstAudioFrameIndex = 1;
+  }
+
+  const audioFrameCount = frameCount - firstAudioFrameIndex;
+  const frameDuration = firstValidFrameHeader.samplesPerFrame / firstValidFrameHeader.sampleRate;
+  const duration = audioFrameCount * frameDuration;
+  const avgBitrate = Math.round(detectedBitrateSum / frameCount);
+  const isVbr = detectedBitrates.size > 1;
+
+  return {
+    frameCount,
+    audioFrameCount,
+    firstAudioFrameIndex,
+    firstFrameOffset: trimmedOffsets[0],
+    sampleRate: firstValidFrameHeader.sampleRate,
+    frameDuration,
+    duration,
+    bitrate: avgBitrate,
+    isVbr,
+    hasXingHeader,
+    frameOffsets: trimmedOffsets,
+  };
+}
+
+function sliceMp3Direct({ buffer, startByte, endByte, partName }) {
+  const sourceBytes = new Uint8Array(buffer);
+  const safeEndByte = Math.min(endByte, sourceBytes.length);
+  const safeStartByte = Math.max(0, startByte);
+
+  if (safeEndByte <= safeStartByte) {
+    throw new Error('Invalid byte slice range for split.');
+  }
+
+  const audioSlice = sourceBytes.subarray(safeStartByte, safeEndByte);
+  const titleBytes = new TextEncoder().encode(partName || 'Split Part');
+  const frameBodyLen = 1 + titleBytes.length;
+
+  const frameHeader = new Uint8Array(10);
+  frameHeader[0] = 0x54; // 'T'
+  frameHeader[1] = 0x49; // 'I'
+  frameHeader[2] = 0x54; // 'T'
+  frameHeader[3] = 0x32; // '2'
+  frameHeader[4] = (frameBodyLen >> 24) & 0xff;
+  frameHeader[5] = (frameBodyLen >> 16) & 0xff;
+  frameHeader[6] = (frameBodyLen >> 8) & 0xff;
+  frameHeader[7] = frameBodyLen & 0xff;
+
+  const totalTagBodySize = 10 + frameBodyLen;
+  const id3Header = new Uint8Array(10);
+  id3Header[0] = 0x49; // 'I'
+  id3Header[1] = 0x44; // 'D'
+  id3Header[2] = 0x33; // '3'
+  id3Header[3] = 0x03; // Version 2.3
+  id3Header[6] = (totalTagBodySize >> 21) & 0x7f;
+  id3Header[7] = (totalTagBodySize >> 14) & 0x7f;
+  id3Header[8] = (totalTagBodySize >> 7) & 0x7f;
+  id3Header[9] = totalTagBodySize & 0x7f;
+
+  const totalLength = 10 + 10 + frameBodyLen + audioSlice.length;
+  const output = new Uint8Array(totalLength);
+
+  let ptr = 0;
+  output.set(id3Header, ptr);
+  ptr += 10;
+  output.set(frameHeader, ptr);
+  ptr += 10;
+  output[ptr] = 0x03; // UTF-8 indicator
+  ptr += 1;
+  output.set(titleBytes, ptr);
+  ptr += titleBytes.length;
+  output.set(audioSlice, ptr);
+
+  return output.buffer;
 }
 
 // =============================================================================
@@ -498,13 +780,11 @@ async function computePeaks() {
     }
 
     const duration = state.index.duration;
-    // Each peak window represents 50 ms (0.05 s)
     const windowSec = 0.05;
     const totalWindows = Math.max(1, Math.ceil(duration / windowSec));
     const peaks = new Float32Array(totalWindows);
-    peaks.fill(-60); // Default silence floor
+    peaks.fill(-60);
 
-    // Process file in ~30s chunks
     const chunkDuration = 30;
     const totalChunks = Math.ceil(duration / chunkDuration);
     const frameOffsets = state.index.frameOffsets;
@@ -549,12 +829,10 @@ async function computePeaks() {
 
           const count = Math.max(1, endSample - startSample);
           const rms = Math.sqrt(sumSquares / count);
-          // Convert to dBFS (-60 to 0)
           const db = Math.max(-60, 20 * Math.log10(rms + 1e-6));
           peaks[globalIdx] = db;
         }
       } catch (decodeErr) {
-        // Individual chunk decode failure: skip gently
         console.warn('Chunk decode error:', decodeErr);
       }
 
@@ -580,7 +858,6 @@ function decodeAudioDataAsync(context, arrayBuffer) {
 function finishPeaksFallback() {
   const totalWindows = Math.max(1, Math.ceil(state.index.duration / 0.05));
   const fallbackPeaks = new Float32Array(totalWindows);
-  // Gentle synthetic waveform so UI is always fully visual
   for (let i = 0; i < totalWindows; i++) {
     fallbackPeaks[i] = -30 + Math.sin(i * 0.1) * 15;
   }
@@ -602,7 +879,7 @@ function initCanvasResize() {
 
 function drawWaveform() {
   const canvas = elements.waveformCanvas;
-  if (!canvas || !state.index) return;
+  if (!canvas || !state.index || !elements.canvasWrapper) return;
 
   const rect = elements.canvasWrapper.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
@@ -627,11 +904,9 @@ function drawWaveform() {
   const step = barWidth + gap;
   const numBars = Math.floor(w / step);
 
-  // 1. Draw Waveform Bars
   const centerY = h / 2;
   const maxBarHeight = (h - 16) / 2;
 
-  // Wave bar color
   const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
   const barColor = isDark ? '#D0BCFF' : '#6750A4';
   ctx.fillStyle = barColor;
@@ -641,7 +916,6 @@ function drawWaveform() {
     const windowIdx = Math.floor((b / numBars) * totalWindows);
     const db = peaks[windowIdx] !== undefined ? peaks[windowIdx] : -60;
 
-    // Normalize -60 dB .. 0 dB to 0.05 .. 1.0
     const norm = Math.max(0.05, Math.min(1.0, (db + 60) / 60));
     const barHeight = norm * maxBarHeight;
 
@@ -650,17 +924,14 @@ function drawWaveform() {
     ctx.fill();
   }
 
-  // 2. Draw Shaded Overlays for Added Parts
   state.parts.forEach((part, index) => {
     const startX = (part.start / state.index.duration) * w;
     const endX = (part.end / state.index.duration) * w;
     const partWidth = Math.max(2, endX - startX);
 
-    // Subtle shaded background for part
     ctx.fillStyle = 'rgba(125, 82, 96, 0.18)';
     ctx.fillRect(startX, 0, partWidth, h);
 
-    // Border lines
     ctx.strokeStyle = 'rgba(125, 82, 96, 0.7)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
@@ -670,7 +941,6 @@ function drawWaveform() {
     ctx.lineTo(endX, h);
     ctx.stroke();
 
-    // Part index badge on canvas
     ctx.fillStyle = isDark ? '#FFD8E4' : '#7D5260';
     ctx.font = '600 10px Roboto, sans-serif';
     ctx.fillText(`#${index + 1} ${part.name}`, startX + 4, 14);
@@ -679,6 +949,7 @@ function drawWaveform() {
 
 function initWaveformEvents() {
   const wrapper = elements.canvasWrapper;
+  if (!wrapper) return;
 
   wrapper.addEventListener('mousemove', (e) => {
     if (!state.index) return;
@@ -755,7 +1026,6 @@ function analyzeSilence() {
 
   const minSilenceWindows = Math.ceil(minSilenceSec / windowSec);
 
-  // Find consecutive silent windows
   const silentRanges = [];
   let inSilence = false;
   let silenceStart = 0;
@@ -781,7 +1051,6 @@ function analyzeSilence() {
     }
   }
 
-  // Trailing silence
   if (inSilence && peaks.length - silenceStart >= minSilenceWindows) {
     silentRanges.push({
       start: silenceStart * windowSec,
@@ -790,17 +1059,14 @@ function analyzeSilence() {
     });
   }
 
-  // Generate cut points
   const cutPoints = [];
   silentRanges.forEach((range) => {
-    // Snap to nearest MP3 frame time
     const snappedTime = Math.round(range.mid / frameDuration) * frameDuration;
     if (snappedTime > 0 && snappedTime < duration) {
       cutPoints.push(snappedTime);
     }
   });
 
-  // Build candidate parts between cut points
   const candidateBoundaries = [0, ...cutPoints, duration];
   let rawCandidates = [];
 
@@ -810,19 +1076,16 @@ function analyzeSilence() {
     rawCandidates.push({ start, end });
   }
 
-  // Merge parts shorter than minPartSec
   const filteredCandidates = [];
   for (let i = 0; i < rawCandidates.length; i++) {
     const cand = rawCandidates[i];
     if (cand.end - cand.start < minPartSec && filteredCandidates.length > 0) {
-      // Merge into previous part
       filteredCandidates[filteredCandidates.length - 1].end = cand.end;
     } else {
       filteredCandidates.push({ ...cand });
     }
   }
 
-  // Format suggestions
   state.suggestions = filteredCandidates.map((cand, idx) => {
     const padNum = String(idx + 1).padStart(2, '0');
     return {
@@ -831,7 +1094,7 @@ function analyzeSilence() {
       start: cand.start,
       end: cand.end,
       duration: cand.end - cand.start,
-      selected: true, // Selected by default for user convenience
+      selected: true,
     };
   });
 
@@ -938,7 +1201,6 @@ function addSelectedSuggestions() {
     });
   });
 
-  // Sort parts stably by start time
   state.parts.sort((a, b) => a.start - b.start);
 
   closeDialog();
@@ -956,7 +1218,6 @@ function openRangeDialog() {
   state.ui.dialog = 'range';
   elements.rangeDialog.classList.add('open');
 
-  // Default suggested range
   elements.inputRangeStart.value = '0';
   elements.inputRangeEnd.value = Math.min(60, state.index.duration).toFixed(1);
   validateRangeInputs();
@@ -1001,7 +1262,6 @@ function addRangePart() {
   const endSec = parseFloat(elements.inputRangeEnd.value);
   const frameDuration = state.index.frameDuration;
 
-  // Snap start down and end up to frame boundaries
   const snappedStart = Math.floor(startSec / frameDuration) * frameDuration;
   const snappedEnd = Math.min(state.index.duration, Math.ceil(endSec / frameDuration) * frameDuration);
 
@@ -1056,12 +1316,10 @@ function renderParts() {
     li.className = 'part-item';
     li.id = `item_${part.id}`;
 
-    // Index badge
     const badge = document.createElement('div');
     badge.className = 'part-badge';
     badge.textContent = `#${index + 1}`;
 
-    // Center content (name input & time range)
     const content = document.createElement('div');
     content.className = 'part-content';
 
@@ -1095,11 +1353,9 @@ function renderParts() {
     content.appendChild(nameInput);
     content.appendChild(meta);
 
-    // Right actions (Preview, Delete, Split)
     const actions = document.createElement('div');
     actions.className = 'part-actions';
 
-    // Preview button
     const btnPreview = document.createElement('button');
     btnPreview.type = 'button';
     btnPreview.className = 'btn-icon';
@@ -1114,7 +1370,6 @@ function renderParts() {
       togglePreviewPart(part);
     });
 
-    // Delete button
     const btnDelete = document.createElement('button');
     btnDelete.type = 'button';
     btnDelete.className = 'btn-icon';
@@ -1131,7 +1386,6 @@ function renderParts() {
       deletePart(part.id);
     });
 
-    // Split button
     const btnSplit = document.createElement('button');
     btnSplit.type = 'button';
     btnSplit.className = `btn btn-primary btn-split ${part.status === 'done' ? 'done' : ''}`;
@@ -1192,7 +1446,6 @@ function deletePart(id) {
   renderParts();
   drawWaveform();
 
-  // 5-second Undo Toast
   showSnackbar(`Deleted "${deleted.name}".`, 'Undo', () => {
     state.parts.splice(partIndex, 0, deleted);
     renderParts();
@@ -1212,7 +1465,6 @@ function togglePlayWholeFile() {
     elements.playIcon.classList.remove('hidden');
     elements.pauseIcon.classList.add('hidden');
   } else {
-    // If not loaded into audio element yet
     if (state.ui.previewId !== 'whole') {
       const blob = new Blob([state.file.buffer], { type: 'audio/mpeg' });
       const url = URL.createObjectURL(blob);
@@ -1265,14 +1517,16 @@ function playAudioRange(startSec, endSec, partId = null) {
 }
 
 function stopPreview() {
-  if (!elements.previewAudio.paused) {
+  if (elements.previewAudio && !elements.previewAudio.paused) {
     elements.previewAudio.pause();
   }
-  elements.previewAudio.removeAttribute('src');
+  if (elements.previewAudio) {
+    elements.previewAudio.removeAttribute('src');
+  }
   state.ui.previewId = null;
   state.ui.isWholePlaying = false;
-  elements.playIcon.classList.remove('hidden');
-  elements.pauseIcon.classList.add('hidden');
+  if (elements.playIcon) elements.playIcon.classList.remove('hidden');
+  if (elements.pauseIcon) elements.pauseIcon.classList.add('hidden');
   renderParts();
 }
 
@@ -1282,7 +1536,6 @@ function stopPreview() {
 async function splitPart(part) {
   if (part.status === 'working') return;
 
-  // Request screen wake lock so screen doesn't sleep during splitting
   acquireWakeLock();
 
   part.status = 'working';
@@ -1298,23 +1551,45 @@ async function splitPart(part) {
     const startByte = frameOffsets[startFrame];
     const endByte = endFrame < frameOffsets.length ? frameOffsets[endFrame] : state.file.buffer.byteLength;
 
-    // Send slice task to worker
-    // We send slice buffer to worker to avoid UI freeze
-    const sliceBuffer = state.file.buffer.slice(startByte, endByte);
+    if (mp3Worker) {
+      try {
+        const sliceBuffer = state.file.buffer.slice(startByte, endByte);
+        mp3Worker.postMessage(
+          {
+            action: 'sliceMp3',
+            payload: {
+              buffer: sliceBuffer,
+              startByte: 0,
+              endByte: sliceBuffer.byteLength,
+              partName: part.name,
+              id: part.id,
+            },
+          },
+          [sliceBuffer]
+        );
+        return;
+      } catch (e) {
+        console.warn('Worker slice postMessage failed, falling back to in-thread:', e);
+      }
+    }
 
-    mp3Worker.postMessage(
-      {
-        action: 'sliceMp3',
-        payload: {
-          buffer: sliceBuffer,
-          startByte: 0,
-          endByte: sliceBuffer.byteLength,
+    // In-thread slicing
+    setTimeout(() => {
+      try {
+        const slicedBuffer = sliceMp3Direct({
+          buffer: state.file.buffer,
+          startByte,
+          endByte,
           partName: part.name,
-          id: part.id,
-        },
-      },
-      [sliceBuffer]
-    );
+        });
+        onSliceComplete(part.id, part.name, slicedBuffer);
+      } catch (err) {
+        part.status = 'error';
+        releaseWakeLock();
+        renderParts();
+        showSnackbar('Failed to split part: ' + err.message);
+      }
+    }, 20);
   } catch (err) {
     console.error('Split error:', err);
     part.status = 'error';
@@ -1347,7 +1622,6 @@ async function downloadBlob(blob, fileName) {
     /iPad|iPhone|iPod/.test(navigator.userAgent) ||
     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
-  // If iOS Safari supports Web Share API with files, use it for "Save to Files"
   if (isIOS && navigator.canShare) {
     try {
       const file = new File([blob], fileName, { type: 'audio/mpeg' });
@@ -1361,13 +1635,11 @@ async function downloadBlob(blob, fileName) {
       }
     } catch (err) {
       if (err.name === 'AbortError') {
-        // User cancelled share dialog, safe to ignore
         return;
       }
     }
   }
 
-  // Standard Anchor Download (Android / Desktop / Fallback)
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.style.display = 'none';
@@ -1379,7 +1651,6 @@ async function downloadBlob(blob, fileName) {
 
   showSnackbar(`Downloaded "${fileName}".`);
 
-  // Revoke object URL after 60 seconds to prevent memory leak
   setTimeout(() => {
     URL.revokeObjectURL(url);
   }, 60000);
@@ -1420,7 +1691,6 @@ async function handleInstallClick() {
     }
     state.deferredInstallPrompt = null;
   } else {
-    // Show iOS install instructions sheet
     state.ui.dialog = 'ios';
     elements.iosInstallModal.classList.add('open');
   }
@@ -1430,9 +1700,9 @@ async function handleInstallClick() {
 // Dialog & UI State Helpers
 // =============================================================================
 function closeDialog() {
-  elements.autoSplitDialog.classList.remove('open');
-  elements.rangeDialog.classList.remove('open');
-  elements.iosInstallModal.classList.remove('open');
+  if (elements.autoSplitDialog) elements.autoSplitDialog.classList.remove('open');
+  if (elements.rangeDialog) elements.rangeDialog.classList.remove('open');
+  if (elements.iosInstallModal) elements.iosInstallModal.classList.remove('open');
   state.ui.dialog = null;
 }
 
@@ -1458,13 +1728,13 @@ function hideLoading() {
 }
 
 function enableActionButtons() {
-  elements.btnOpenAuto.disabled = false;
-  elements.btnOpenRange.disabled = false;
+  if (elements.btnOpenAuto) elements.btnOpenAuto.disabled = false;
+  if (elements.btnOpenRange) elements.btnOpenRange.disabled = false;
 }
 
 function disableActionButtons() {
-  elements.btnOpenAuto.disabled = true;
-  elements.btnOpenRange.disabled = true;
+  if (elements.btnOpenAuto) elements.btnOpenAuto.disabled = true;
+  if (elements.btnOpenRange) elements.btnOpenRange.disabled = true;
 }
 
 let snackbarTimer = null;
@@ -1505,7 +1775,6 @@ function formatTime(seconds) {
 
 function sanitizeFileName(name) {
   if (!name) return 'Part';
-  // Strip characters illegal in filesystem names
   let clean = name.replace(/[\\/:*?"<>|]/g, '').trim();
   clean = clean.replace(/\s+/g, ' ');
   return clean.slice(0, 100) || 'Part';
