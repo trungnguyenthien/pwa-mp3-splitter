@@ -219,6 +219,11 @@ body {
   user-select: none;
 }
 
+.btn > svg,
+.btn > span {
+  pointer-events: none;
+}
+
 .btn:active:not(:disabled) {
   transform: scale(0.98);
 }
@@ -506,14 +511,16 @@ body {
 }
 
 .file-actions-group {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   width: 100%;
 }
 
 .file-actions-group .btn {
-  width: 100%;
+  flex: 1 1 0;
+  min-width: 86px;
+  min-height: 38px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1007,8 +1014,10 @@ body {
 }
 
 .dialog-backdrop.open {
-  opacity: 1;
-  pointer-events: auto;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  display: flex !important;
+  visibility: visible !important;
 }
 
 .dialog-panel {
@@ -1023,11 +1032,13 @@ body {
   box-shadow: var(--elevation-3);
   overflow: hidden;
   transform: translateY(20px) scale(0.98);
-  transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1);
+  transition: transform 0.2s cubic-bezier(0.2, 0, 0, 1), opacity 0.2s ease;
 }
 
 .dialog-backdrop.open .dialog-panel {
-  transform: translateY(0) scale(1);
+  transform: translateY(0) scale(1) !important;
+  opacity: 1 !important;
+  visibility: visible !important;
 }
 
 .dialog-header {
@@ -1234,7 +1245,9 @@ body {
   }
 
   .dialog-backdrop.open .dialog-panel {
-    transform: translateY(0);
+    transform: translateY(0) !important;
+    opacity: 1 !important;
+    visibility: visible !important;
   }
 
   .range-dialog-body {

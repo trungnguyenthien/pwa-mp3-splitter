@@ -3231,30 +3231,51 @@ let tempModalCover = {
 };
 
 function openEditTagsDialog() {
-  if (!state.file) return;
+  if (!state.file) {
+    showSnackbar('Please choose an audio file first.');
+    return;
+  }
+
+  if (state.ui.loading) {
+    showSnackbar('Audio file is still indexing, please wait a moment...');
+    return;
+  }
 
   state.ui.dialog = 'editTags';
 
+  const meta = state.metadata || (state.metadata = {
+    artist: '',
+    album: '',
+    year: '',
+    coverBytes: null,
+    coverMime: null,
+    coverDataUrl: null,
+    isOriginalCoverUrl: false,
+  });
+
   tempModalCover = {
-    bytes: state.metadata.coverBytes,
-    mime: state.metadata.coverMime,
-    dataUrl: state.metadata.coverDataUrl,
+    bytes: meta.coverBytes || null,
+    mime: meta.coverMime || null,
+    dataUrl: meta.coverDataUrl || null,
   };
 
   if (elements.inputTagArtist) {
-    elements.inputTagArtist.value = state.metadata.artist || '';
+    elements.inputTagArtist.value = meta.artist || '';
   }
   if (elements.inputTagAlbum) {
-    elements.inputTagAlbum.value = state.metadata.album || '';
+    elements.inputTagAlbum.value = meta.album || '';
   }
   if (elements.inputTagYear) {
-    elements.inputTagYear.value = state.metadata.year || '';
+    elements.inputTagYear.value = meta.year || '';
   }
 
   updateModalCoverView();
 
   if (elements.editTagsModal) {
     elements.editTagsModal.classList.add('open');
+    elements.editTagsModal.style.display = 'flex';
+    elements.editTagsModal.style.opacity = '1';
+    elements.editTagsModal.style.pointerEvents = 'auto';
   }
 }
 
@@ -3615,7 +3636,12 @@ function closeDialog() {
   if (elements.fileInfoDialog) elements.fileInfoDialog.classList.remove('open');
   if (elements.iosInstallModal) elements.iosInstallModal.classList.remove('open');
   if (elements.formatErrorModal) elements.formatErrorModal.classList.remove('open');
-  if (elements.editTagsModal) elements.editTagsModal.classList.remove('open');
+  if (elements.editTagsModal) {
+    elements.editTagsModal.classList.remove('open');
+    elements.editTagsModal.style.display = '';
+    elements.editTagsModal.style.opacity = '';
+    elements.editTagsModal.style.pointerEvents = '';
+  }
   closeTimeWheel();
   state.ui.dialog = null;
   if (state.ui.previewId) {
@@ -3727,3 +3753,16 @@ function escapeHtml(str) {
   div.textContent = str;
   return div.innerHTML;
 }
+
+// =============================================================================
+// Window Exports (for inline HTML handlers, mobile resilience, and testing)
+// =============================================================================
+window.openEditTagsDialog = openEditTagsDialog;
+window.closeDialog = closeDialog;
+window.saveEditTags = saveEditTags;
+window.removeCoverArtInModal = removeCoverArtInModal;
+window.processCoverImageFile = processCoverImageFile;
+window.openFileInfoDialog = openFileInfoDialog;
+window.openAutoDialog = openAutoDialog;
+window.openRangeDialog = openRangeDialog;
+
