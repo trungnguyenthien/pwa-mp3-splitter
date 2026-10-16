@@ -14,6 +14,11 @@
 - **2 Chế độ phân đoạn**:
   - **Auto Split (Silence Detection)**: Tự động phát hiện khoảng lặng (silence) để đề xuất danh sách bài hát. Có thanh trượt tùy chỉnh ngưỡng dB và thời lượng tối thiểu trong Advanced Settings.
   - **Time Range (Mobile-First Jog Wheel)**: Thẻ chạm đôi Bắt đầu / Kết thúc kết hợp con xoay bánh xe (DAW Jog Wheel) cuộn mượt mà định dạng `mm:ss`, kèm các bước nhảy nhanh `±1s` và `±10s`.
+- **Chỉnh sửa thông tin bài hát & Ảnh bìa (Tag & Cover Art Editor)**:
+  - Xem và chỉnh sửa Artist (Nghệ sĩ), Album, Năm phát hành (Year) và Ảnh bìa (Thumbnail / Cover Art).
+  - Tự động trích xuất metadata và artwork sẵn có từ file gốc (ID3v2 cho MP3, `moov.udta.meta.ilst` cho M4A).
+  - Hỗ trợ đổi ảnh bìa bằng cách chụp ảnh hoặc chọn ảnh từ máy (JPG, PNG, WEBP). Tự động tối ưu qua HTML5 Canvas về kích thước 500x500 (~40 KB) để file nhạc không bị phình dung lượng.
+  - Khi xuất/cắt từng phần nhạc, metadata và ảnh thumbnail sẽ được nhúng trực tiếp vào từng đoạn cắt (chuẩn `ID3v2 APIC` cho MP3 và `ilst covr` cho M4A) với tốc độ tức thì (< 2ms) mà không làm suy giảm chất lượng âm thanh.
 - **Tương thích Mobile (Android WebAPK & iOS Safari)**:
   - Hỗ trợ cài đặt màn hình chính (PWA standalone).
   - Tích hợp Web Share API cho iOS Safari để lưu file trực tiếp vào **"Lưu vào Tệp" (Save to Files)**.

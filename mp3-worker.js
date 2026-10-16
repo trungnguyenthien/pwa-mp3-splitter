@@ -70,12 +70,36 @@ function concatBuffers(...arrays) {
   return res;
 }
 
-function makeMetaUdta(title) {
-  if (!title) return new Uint8Array(0);
-  const titleBytes = new TextEncoder().encode(title);
-  const dataAtom = packAtom('data', concatBuffers(new Uint8Array([0, 0, 0, 1, 0, 0, 0, 0]), titleBytes));
-  const namAtom = packAtom('\xA9nam', dataAtom);
-  const ilstAtom = packAtom('ilst', namAtom);
+function makeMetaUdta(metadataOrTitle) {
+  const meta = typeof metadataOrTitle === 'string' ? { title: metadataOrTitle } : (metadataOrTitle || {});
+  const atoms = [];
+
+  function addStringAtom(name, str) {
+    if (!str) return;
+    const strBytes = new TextEncoder().encode(str);
+    const dataPayload = concatBuffers(new Uint8Array([0, 0, 0, 1, 0, 0, 0, 0]), strBytes);
+    const dataAtom = packAtom('data', dataPayload);
+    atoms.push(packAtom(name, dataAtom));
+  }
+
+  addStringAtom('\xA9nam', meta.title);
+  addStringAtom('\xA9ART', meta.artist);
+  addStringAtom('aART', meta.artist);
+  addStringAtom('\xA9alb', meta.album);
+  if (meta.year) addStringAtom('\xA9day', String(meta.year));
+
+  if (meta.imageBytes && meta.imageBytes.length > 0) {
+    const isPng = meta.imageMime && meta.imageMime.includes('png');
+    const typeFlag = isPng ? 14 : 13;
+    const dataPayload = concatBuffers(new Uint8Array([0, 0, 0, typeFlag, 0, 0, 0, 0]), meta.imageBytes);
+    const dataAtom = packAtom('data', dataPayload);
+    atoms.push(packAtom('covr', dataAtom));
+  }
+
+  if (atoms.length === 0) return new Uint8Array(0);
+
+  const ilstPayload = concatBuffers(...atoms);
+  const ilstAtom = packAtom('ilst', ilstPayload);
   const metaPayload = concatBuffers(new Uint8Array([0, 0, 0, 0]), ilstAtom);
   const metaAtom = packAtom('meta', metaPayload);
   return packAtom('udta', metaAtom);
@@ -333,7 +357,7 @@ function sliceM4a({ buffer, sampleSizes, timescale, mvhdTimescale, rawAtoms, par
   }
   const newTkhd = packAtom('tkhd', tkhdPayload);
 
-  const udtaBytes = makeMetaUdta(partName);
+  const udtaBytes = makeMetaUdta(payload.metadata || partName);
 
   function assembleMoov(mdatOffset) {
     const stcoPayload = new Uint8Array(12);
@@ -732,57 +756,15 @@ function sliceMp3({ buffer, startByte, endByte, partName, id }) {
 
   const audioSlice = sourceBytes.subarray(safeStartByte, safeEndByte);
 
-  // Build ID3v2.3 header + TIT2 frame
-  const titleBytes = new TextEncoder().encode(partName || 'Split Part');
-  // TIT2 body: 0x03 (UTF-8 encoding) + title bytes
-  const frameBodyLen = 1 + titleBytes.length;
-  const frameHeader = new Uint8Array(10);
-  // "TIT2"
-  frameHeader[0] = 0x54;
-  frameHeader[1] = 0x49;
-  frameHeader[2] = 0x54;
-  frameHeader[3] = 0x32;
-  // Frame size (32-bit int)
-  frameHeader[4] = (frameBodyLen >> 24) & 0xff;
-  frameHeader[5] = (frameBodyLen >> 16) & 0xff;
-  frameHeader[6] = (frameBodyLen >> 8) & 0xff;
-  frameHeader[7] = frameBodyLen & 0xff;
-  // Flags: 0, 0
-  frameHeader[8] = 0x00;
-  frameHeader[9] = 0x00;
+  // Build ID3v2.3 tag with Title, Artist, Album, Year, and Cover Art (APIC)
+  const meta = Object.assign({}, payload.metadata);
+  if (!meta.title) meta.title = partName || 'Split Part';
+  const id3Tag = makeId3v2Tag(meta);
 
-  const totalTagBodySize = 10 + frameBodyLen;
-
-  // ID3v2 header: 10 bytes
-  const id3Header = new Uint8Array(10);
-  // "ID3"
-  id3Header[0] = 0x49;
-  id3Header[1] = 0x44;
-  id3Header[2] = 0x33;
-  // Version 2.3.0
-  id3Header[3] = 0x03;
-  id3Header[4] = 0x00;
-  id3Header[5] = 0x00; // flags
-  // Synchsafe integer for totalTagBodySize
-  id3Header[6] = (totalTagBodySize >> 21) & 0x7f;
-  id3Header[7] = (totalTagBodySize >> 14) & 0x7f;
-  id3Header[8] = (totalTagBodySize >> 7) & 0x7f;
-  id3Header[9] = totalTagBodySize & 0x7f;
-
-  // Combine: id3Header (10) + frameHeader (10) + frameBody (1 + titleBytes.length) + audioSlice
-  const totalLength = 10 + 10 + frameBodyLen + audioSlice.length;
+  const totalLength = id3Tag.length + audioSlice.length;
   const output = new Uint8Array(totalLength);
-
-  let writePtr = 0;
-  output.set(id3Header, writePtr);
-  writePtr += 10;
-  output.set(frameHeader, writePtr);
-  writePtr += 10;
-  output[writePtr] = 0x03; // UTF-8 indicator
-  writePtr += 1;
-  output.set(titleBytes, writePtr);
-  writePtr += titleBytes.length;
-  output.set(audioSlice, writePtr);
+  output.set(id3Tag, 0);
+  output.set(audioSlice, id3Tag.length);
 
   self.postMessage(
     {
@@ -793,4 +775,76 @@ function sliceMp3({ buffer, startByte, endByte, partName, id }) {
     },
     [output.buffer]
   );
+}
+
+function makeId3v2Tag({ title, artist, album, year, imageBytes, imageMime }) {
+  const frames = [];
+
+  function addTextFrame(id, text) {
+    if (!text) return;
+    const strBytes = new TextEncoder().encode(text);
+    const bodyLen = 1 + strBytes.length; // 0x03 (UTF-8) + text
+    const frame = new Uint8Array(10 + bodyLen);
+    for (let i = 0; i < 4; i++) frame[i] = id.charCodeAt(i);
+    frame[4] = (bodyLen >> 24) & 0xff;
+    frame[5] = (bodyLen >> 16) & 0xff;
+    frame[6] = (bodyLen >> 8) & 0xff;
+    frame[7] = bodyLen & 0xff;
+    frame[8] = 0;
+    frame[9] = 0;
+    frame[10] = 0x03; // UTF-8
+    frame.set(strBytes, 11);
+    frames.push(frame);
+  }
+
+  addTextFrame('TIT2', title);
+  addTextFrame('TPE1', artist);
+  addTextFrame('TALB', album);
+  if (year) addTextFrame('TYER', String(year));
+
+  if (imageBytes && imageBytes.length > 0) {
+    const mime = imageMime || 'image/jpeg';
+    const mimeBytes = new TextEncoder().encode(mime);
+    const bodyLen = 1 + mimeBytes.length + 1 + 1 + 1 + imageBytes.length;
+    const frame = new Uint8Array(10 + bodyLen);
+    frame[0] = 0x41; frame[1] = 0x50; frame[2] = 0x49; frame[3] = 0x43; // APIC
+    frame[4] = (bodyLen >> 24) & 0xff;
+    frame[5] = (bodyLen >> 16) & 0xff;
+    frame[6] = (bodyLen >> 8) & 0xff;
+    frame[7] = bodyLen & 0xff;
+    frame[8] = 0;
+    frame[9] = 0;
+
+    let p = 10;
+    frame[p++] = 0x00; // ISO-8859-1 for mime/description
+    frame.set(mimeBytes, p);
+    p += mimeBytes.length;
+    frame[p++] = 0x00; // null terminator for MIME
+    frame[p++] = 0x03; // Picture Type: 0x03 = Cover (front)
+    frame[p++] = 0x00; // empty description null terminator
+    frame.set(imageBytes, p);
+    frames.push(frame);
+  }
+
+  let totalFramesLen = 0;
+  for (const f of frames) totalFramesLen += f.length;
+
+  const header = new Uint8Array(10);
+  header[0] = 0x49; header[1] = 0x44; header[2] = 0x33; // ID3
+  header[3] = 0x03; // v2.3.0
+  header[4] = 0x00;
+  header[5] = 0x00; // flags
+  header[6] = (totalFramesLen >> 21) & 0x7f;
+  header[7] = (totalFramesLen >> 14) & 0x7f;
+  header[8] = (totalFramesLen >> 7) & 0x7f;
+  header[9] = totalFramesLen & 0x7f;
+
+  const out = new Uint8Array(10 + totalFramesLen);
+  out.set(header, 0);
+  let writePtr = 10;
+  for (const f of frames) {
+    out.set(f, writePtr);
+    writePtr += f.length;
+  }
+  return out;
 }

@@ -7,7 +7,7 @@
   <meta name="description" content="Split MP3 audio files fast, losslessly and 100% offline in your browser. Zero quality loss, no server upload, frame-accurate cutting.">
 
   <!-- PWA & Mobile Capabilities -->
-  <link rel="manifest" href="./manifest.webmanifest?v=29">
+  <link rel="manifest" href="./manifest.webmanifest?v=31">
   <meta name="theme-color" content="#141518">
   <meta name="mobile-web-app-capable" content="yes">
   
@@ -22,7 +22,7 @@
   <link rel="icon" type="image/png" href="./icons/favicon.png">
 
   <!-- Versioned Stylesheet adhering to pwa-standards.md -->
-  <link rel="stylesheet" href="./styles.css?v=30">
+  <link rel="stylesheet" href="./styles.css?v=31">
 </head>
 <body>
 
@@ -82,12 +82,21 @@
 
       <!-- Loaded File Details Card (hidden initially) -->
       <div id="fileInfoSection" class="card file-loaded-card hidden">
-        <div class="file-music-icon" aria-hidden="true">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 18V5l12-2v13"/>
-            <circle cx="6" cy="18" r="3"/>
-            <circle cx="18" cy="16" r="3"/>
-          </svg>
+        <div class="file-music-icon" id="fileCoverThumbnail" aria-label="Cover art" title="Click to edit tags & artwork" role="button" tabindex="0">
+          <img id="fileCoverImg" class="file-cover-img hidden" alt="Cover Art">
+          <div id="fileDefaultIcon" class="file-default-icon" aria-hidden="true">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 18V5l12-2v13"/>
+              <circle cx="6" cy="18" r="3"/>
+              <circle cx="18" cy="16" r="3"/>
+            </svg>
+          </div>
+          <div class="file-cover-badge" aria-hidden="true" title="Edit artwork">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 20h9"/>
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+            </svg>
+          </div>
         </div>
 
         <div class="file-info-content">
@@ -109,9 +118,16 @@
             </div>
           </div>
 
-          <!-- Row 3: Action Buttons (Song Info & Change File) -->
+          <!-- Row 3: Action Buttons (Edit Tags, Song Info & Change File) -->
           <div class="file-actions-group">
-            <button type="button" id="btnOpenFileInfo" class="btn btn-tonal btn-sm" aria-label="Show MP3 file details" title="View technical audio details">
+            <button type="button" id="btnOpenEditTags" class="btn btn-tonal btn-sm" aria-label="Edit song tags and cover art" title="Edit Artist, Album, and Cover Art">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 20h9"/>
+                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+              </svg>
+              <span>Edit Tags</span>
+            </button>
+            <button type="button" id="btnOpenFileInfo" class="btn btn-tonal btn-sm" aria-label="Show audio file details" title="View technical audio details">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="10"/>
                 <line x1="12" y1="16" x2="12" y2="12"/>
@@ -563,6 +579,97 @@
     </div>
   </div>
 
+  <!-- Edit Tags & Artwork Modal -->
+  <div id="editTagsModal" class="dialog-backdrop" role="dialog" aria-modal="true" aria-labelledby="editTagsDialogTitle">
+    <div class="dialog-panel" style="max-width: 480px;">
+      <div class="dialog-header">
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <div style="width: 36px; height: 36px; min-width: 36px; border-radius: 50%; background: var(--md-sys-color-primary-container); display: flex; align-items: center; justify-content: center; color: var(--md-sys-color-on-primary-container);" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 20h9"/>
+              <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+            </svg>
+          </div>
+          <div>
+            <h2 id="editTagsDialogTitle" class="dialog-title" style="font-size: 1.125rem;">Edit Metadata & Artwork</h2>
+            <div style="font-size: 0.75rem; color: var(--md-sys-color-on-surface-variant);">Embedded losslessly into all exported parts</div>
+          </div>
+        </div>
+        <button id="btnCloseEditTagsDialog" class="btn-icon" aria-label="Close dialog">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="18" y1="6" x2="6" y2="18"/>
+            <line x1="6" y1="6" x2="18" y2="18"/>
+          </svg>
+        </button>
+      </div>
+
+      <div class="dialog-body" style="padding: 18px 20px; gap: 16px;">
+        <!-- Artwork upload section -->
+        <div class="edit-tags-cover-container">
+          <div class="edit-cover-preview-box" id="modalCoverBox" tabindex="0" role="button" aria-label="Upload or change cover art">
+            <img id="modalCoverImg" class="edit-cover-img hidden" alt="Artwork preview">
+            <div id="modalCoverPlaceholder" class="edit-cover-placeholder">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
+              <span>Upload Cover Art</span>
+            </div>
+            <div class="edit-cover-hover-overlay">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              <span>Change Image</span>
+            </div>
+          </div>
+          <input type="file" id="coverArtFileInput" accept="image/jpeg,image/png,image/webp" class="hidden">
+
+          <div class="edit-cover-actions">
+            <div style="font-weight: 600; font-size: 0.875rem; color: var(--md-sys-color-on-surface); margin-bottom: 2px;">Cover Artwork</div>
+            <div style="font-size: 0.75rem; color: var(--md-sys-color-on-surface-variant); line-height: 1.4; margin-bottom: 8px;">Supports JPG, PNG, WEBP. Auto-optimized to 500x500 (~40 KB) to keep downloads lightweight.</div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button type="button" id="btnUploadCoverArt" class="btn btn-tonal btn-sm">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                <span>Upload Image</span>
+              </button>
+              <button type="button" id="btnRemoveCoverArt" class="btn btn-tonal btn-sm hidden" style="color: var(--md-sys-color-error);">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                <span>Remove</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tag input fields -->
+        <div class="edit-tags-form-group">
+          <label for="inputTagArtist" class="edit-tags-label">Artist / Nghệ sĩ</label>
+          <input type="text" id="inputTagArtist" class="text-input" placeholder="e.g. Sơn Tùng M-TP, Coldplay" maxlength="120" autocomplete="off">
+        </div>
+
+        <div class="edit-tags-form-group">
+          <label for="inputTagAlbum" class="edit-tags-label">Album / Tuyển tập</label>
+          <input type="text" id="inputTagAlbum" class="text-input" placeholder="e.g. Greatest Hits, Acoustic Live" maxlength="120" autocomplete="off">
+        </div>
+
+        <div class="edit-tags-form-group">
+          <label for="inputTagYear" class="edit-tags-label">Year / Năm phát hành</label>
+          <input type="text" id="inputTagYear" class="text-input" placeholder="e.g. 2026" maxlength="4" pattern="[0-9]{4}" autocomplete="off">
+        </div>
+      </div>
+
+      <div class="dialog-footer" style="display: flex; gap: 10px; justify-content: flex-end;">
+        <button id="btnCancelEditTags" type="button" class="btn btn-tonal">Cancel</button>
+        <button id="btnSaveTags" type="button" class="btn btn-primary" style="min-width: 110px;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Save Tags</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Shared Preview Audio Element -->
   <audio id="previewAudio" preload="auto" class="hidden"></audio>
 
@@ -573,6 +680,6 @@
   </div>
 
   <!-- Application Logic with Cache-Busting adhering to pwa-standards.md -->
-  <script defer src="./app.js?v=30"></script>
+  <script defer src="./app.js?v=31"></script>
 </body>
 </html>

@@ -40,6 +40,15 @@ const state = {
     currentTime: 0,
     isWholePlaying: false,
   },
+  metadata: {
+    artist: '',
+    album: '',
+    year: '',
+    coverBytes: null,
+    coverMime: null,
+    coverDataUrl: null,
+    isOriginalCoverUrl: false,
+  },
   deletedPartStack: [],
   deferredInstallPrompt: null,
   wakeLock: null,
@@ -80,13 +89,33 @@ function initElements() {
     fileInput: document.getElementById('fileInput'),
     btnChooseFile: document.getElementById('btnChooseFile'),
     fileInfoSection: document.getElementById('fileInfoSection'),
+    fileCoverThumbnail: document.getElementById('fileCoverThumbnail'),
+    fileCoverImg: document.getElementById('fileCoverImg'),
+    fileDefaultIcon: document.getElementById('fileDefaultIcon'),
     btnChangeFile: document.getElementById('btnChangeFile'),
+    btnOpenEditTags: document.getElementById('btnOpenEditTags'),
     btnOpenFileInfo: document.getElementById('btnOpenFileInfo'),
     fileNameDisplay: document.getElementById('fileNameDisplay'),
+    fileSubtext: document.getElementById('fileSubtext'),
     statDuration: document.getElementById('statDuration'),
     statBitrate: document.getElementById('statBitrate'),
     statSampleRate: document.getElementById('statSampleRate'),
     statSize: document.getElementById('statSize'),
+
+    // Edit Tags Dialog Elements
+    editTagsModal: document.getElementById('editTagsModal'),
+    btnCloseEditTagsDialog: document.getElementById('btnCloseEditTagsDialog'),
+    btnCancelEditTags: document.getElementById('btnCancelEditTags'),
+    btnSaveTags: document.getElementById('btnSaveTags'),
+    modalCoverBox: document.getElementById('modalCoverBox'),
+    modalCoverImg: document.getElementById('modalCoverImg'),
+    modalCoverPlaceholder: document.getElementById('modalCoverPlaceholder'),
+    coverArtFileInput: document.getElementById('coverArtFileInput'),
+    btnUploadCoverArt: document.getElementById('btnUploadCoverArt'),
+    btnRemoveCoverArt: document.getElementById('btnRemoveCoverArt'),
+    inputTagArtist: document.getElementById('inputTagArtist'),
+    inputTagAlbum: document.getElementById('inputTagAlbum'),
+    inputTagYear: document.getElementById('inputTagYear'),
 
     // File Info Dialog Elements
     fileInfoDialog: document.getElementById('fileInfoDialog'),
@@ -208,7 +237,7 @@ function initElements() {
 function initWorker() {
   try {
     if (window.Worker && window.location.protocol !== 'file:') {
-      mp3Worker = new Worker('./mp3-worker.js?v=30');
+      mp3Worker = new Worker('./mp3-worker.js?v=31');
       mp3Worker.onmessage = handleWorkerMessage;
       mp3Worker.onerror = (err) => {
         console.warn('Worker error, switching to in-thread processing:', err);
@@ -412,6 +441,26 @@ function initEvents() {
   // Dialog triggers
   if (elements.btnOpenAuto) elements.btnOpenAuto.addEventListener('click', openAutoDialog);
   if (elements.btnOpenRange) elements.btnOpenRange.addEventListener('click', openRangeDialog);
+  if (elements.btnOpenEditTags) elements.btnOpenEditTags.addEventListener('click', openEditTagsDialog);
+  if (elements.fileCoverThumbnail) elements.fileCoverThumbnail.addEventListener('click', openEditTagsDialog);
+  if (elements.btnCloseEditTagsDialog) elements.btnCloseEditTagsDialog.addEventListener('click', () => closeDialog());
+  if (elements.btnCancelEditTags) elements.btnCancelEditTags.addEventListener('click', () => closeDialog());
+  if (elements.btnSaveTags) elements.btnSaveTags.addEventListener('click', saveEditTags);
+  if (elements.modalCoverBox) elements.modalCoverBox.addEventListener('click', () => {
+    if (elements.coverArtFileInput) elements.coverArtFileInput.click();
+  });
+  if (elements.btnUploadCoverArt) elements.btnUploadCoverArt.addEventListener('click', () => {
+    if (elements.coverArtFileInput) elements.coverArtFileInput.click();
+  });
+  if (elements.btnRemoveCoverArt) elements.btnRemoveCoverArt.addEventListener('click', removeCoverArtInModal);
+  if (elements.coverArtFileInput) {
+    elements.coverArtFileInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        processCoverImageFile(e.target.files[0]);
+      }
+    });
+  }
+
   if (elements.btnOpenFileInfo) elements.btnOpenFileInfo.addEventListener('click', openFileInfoDialog);
   if (elements.btnCloseFileInfoDialog) elements.btnCloseFileInfoDialog.addEventListener('click', () => closeDialog());
   if (elements.btnDismissFileInfo) elements.btnDismissFileInfo.addEventListener('click', () => closeDialog());
@@ -781,6 +830,21 @@ async function processSelectedFile(file) {
   state.suggestions = [];
   state.ui.currentTime = 0;
 
+  // Reset metadata
+  if (state.metadata && state.metadata.coverDataUrl) {
+    try { URL.revokeObjectURL(state.metadata.coverDataUrl); } catch (_) {}
+  }
+  state.metadata = {
+    artist: '',
+    album: '',
+    year: '',
+    coverBytes: null,
+    coverMime: null,
+    coverDataUrl: null,
+    isOriginalCoverUrl: false,
+  };
+  updateMainCardCoverView();
+
   renderParts();
 
   showLoading('Reading audio file into memory...', `Processing "${file.name}"...`);
@@ -806,6 +870,26 @@ async function processSelectedFile(file) {
     }
 
     state.file.buffer = arrayBuffer;
+
+    // Extract embedded tags and cover art if available
+    try {
+      const extracted = formatCheck.isM4a ? extractM4aMetadata(arrayBuffer) : extractMp3Metadata(arrayBuffer);
+      if (extracted) {
+        if (extracted.artist) state.metadata.artist = extracted.artist;
+        if (extracted.album) state.metadata.album = extracted.album;
+        if (extracted.year) state.metadata.year = extracted.year;
+        if (extracted.coverBytes && extracted.coverBytes.length > 0) {
+          state.metadata.coverBytes = extracted.coverBytes;
+          state.metadata.coverMime = extracted.coverMime || 'image/jpeg';
+          state.metadata.coverDataUrl = URL.createObjectURL(new Blob([extracted.coverBytes], { type: state.metadata.coverMime }));
+          state.metadata.isOriginalCoverUrl = true;
+        }
+      }
+    } catch (tagErr) {
+      console.warn('Metadata extraction non-fatal warning:', tagErr);
+    }
+    updateMainCardCoverView();
+
     updateLoadingProgress(15, 'Indexing audio frames (lossless)...');
 
     if (mp3Worker) {
@@ -1152,7 +1236,7 @@ function parseMp3IndexDirect(buffer, onProgress) {
   };
 }
 
-function sliceMp3Direct({ buffer, startByte, endByte, partName }) {
+function sliceMp3Direct({ buffer, startByte, endByte, partName, metadata }) {
   const sourceBytes = new Uint8Array(buffer);
   const safeEndByte = Math.min(endByte, sourceBytes.length);
   const safeStartByte = Math.max(0, startByte);
@@ -1162,45 +1246,88 @@ function sliceMp3Direct({ buffer, startByte, endByte, partName }) {
   }
 
   const audioSlice = sourceBytes.subarray(safeStartByte, safeEndByte);
-  const titleBytes = new TextEncoder().encode(partName || 'Split Part');
-  const frameBodyLen = 1 + titleBytes.length;
+  const meta = Object.assign({}, metadata);
+  if (!meta.title) meta.title = partName || 'Split Part';
+  const id3Tag = makeId3v2Tag(meta);
 
-  const frameHeader = new Uint8Array(10);
-  frameHeader[0] = 0x54; // 'T'
-  frameHeader[1] = 0x49; // 'I'
-  frameHeader[2] = 0x54; // 'T'
-  frameHeader[3] = 0x32; // '2'
-  frameHeader[4] = (frameBodyLen >> 24) & 0xff;
-  frameHeader[5] = (frameBodyLen >> 16) & 0xff;
-  frameHeader[6] = (frameBodyLen >> 8) & 0xff;
-  frameHeader[7] = frameBodyLen & 0xff;
-
-  const totalTagBodySize = 10 + frameBodyLen;
-  const id3Header = new Uint8Array(10);
-  id3Header[0] = 0x49; // 'I'
-  id3Header[1] = 0x44; // 'D'
-  id3Header[2] = 0x33; // '3'
-  id3Header[3] = 0x03; // Version 2.3
-  id3Header[6] = (totalTagBodySize >> 21) & 0x7f;
-  id3Header[7] = (totalTagBodySize >> 14) & 0x7f;
-  id3Header[8] = (totalTagBodySize >> 7) & 0x7f;
-  id3Header[9] = totalTagBodySize & 0x7f;
-
-  const totalLength = 10 + 10 + frameBodyLen + audioSlice.length;
+  const totalLength = id3Tag.length + audioSlice.length;
   const output = new Uint8Array(totalLength);
-
-  let ptr = 0;
-  output.set(id3Header, ptr);
-  ptr += 10;
-  output.set(frameHeader, ptr);
-  ptr += 10;
-  output[ptr] = 0x03; // UTF-8 indicator
-  ptr += 1;
-  output.set(titleBytes, ptr);
-  ptr += titleBytes.length;
-  output.set(audioSlice, ptr);
+  output.set(id3Tag, 0);
+  output.set(audioSlice, id3Tag.length);
 
   return output.buffer;
+}
+
+function makeId3v2Tag({ title, artist, album, year, imageBytes, imageMime }) {
+  const frames = [];
+
+  function addTextFrame(id, text) {
+    if (!text) return;
+    const strBytes = new TextEncoder().encode(text);
+    const bodyLen = 1 + strBytes.length; // 0x03 (UTF-8) + text
+    const frame = new Uint8Array(10 + bodyLen);
+    for (let i = 0; i < 4; i++) frame[i] = id.charCodeAt(i);
+    frame[4] = (bodyLen >> 24) & 0xff;
+    frame[5] = (bodyLen >> 16) & 0xff;
+    frame[6] = (bodyLen >> 8) & 0xff;
+    frame[7] = bodyLen & 0xff;
+    frame[8] = 0;
+    frame[9] = 0;
+    frame[10] = 0x03; // UTF-8 indicator
+    frame.set(strBytes, 11);
+    frames.push(frame);
+  }
+
+  addTextFrame('TIT2', title);
+  addTextFrame('TPE1', artist);
+  addTextFrame('TALB', album);
+  if (year) addTextFrame('TYER', String(year));
+
+  if (imageBytes && imageBytes.length > 0) {
+    const mime = imageMime || 'image/jpeg';
+    const mimeBytes = new TextEncoder().encode(mime);
+    const bodyLen = 1 + mimeBytes.length + 1 + 1 + 1 + imageBytes.length;
+    const frame = new Uint8Array(10 + bodyLen);
+    frame[0] = 0x41; frame[1] = 0x50; frame[2] = 0x49; frame[3] = 0x43; // APIC
+    frame[4] = (bodyLen >> 24) & 0xff;
+    frame[5] = (bodyLen >> 16) & 0xff;
+    frame[6] = (bodyLen >> 8) & 0xff;
+    frame[7] = bodyLen & 0xff;
+    frame[8] = 0;
+    frame[9] = 0;
+
+    let p = 10;
+    frame[p++] = 0x00; // ISO-8859-1 for mime/description
+    frame.set(mimeBytes, p);
+    p += mimeBytes.length;
+    frame[p++] = 0x00; // null terminator for MIME
+    frame[p++] = 0x03; // Picture Type: 0x03 = Cover (front)
+    frame[p++] = 0x00; // empty description null terminator
+    frame.set(imageBytes, p);
+    frames.push(frame);
+  }
+
+  let totalFramesLen = 0;
+  for (const f of frames) totalFramesLen += f.length;
+
+  const header = new Uint8Array(10);
+  header[0] = 0x49; header[1] = 0x44; header[2] = 0x33; // ID3
+  header[3] = 0x03; // v2.3.0
+  header[4] = 0x00;
+  header[5] = 0x00; // flags
+  header[6] = (totalFramesLen >> 21) & 0x7f;
+  header[7] = (totalFramesLen >> 14) & 0x7f;
+  header[8] = (totalFramesLen >> 7) & 0x7f;
+  header[9] = totalFramesLen & 0x7f;
+
+  const out = new Uint8Array(10 + totalFramesLen);
+  out.set(header, 0);
+  let writePtr = 10;
+  for (const f of frames) {
+    out.set(f, writePtr);
+    writePtr += f.length;
+  }
+  return out;
 }
 
 // =============================================================================
@@ -1229,12 +1356,36 @@ function concatM4aBuffers(...arrays) {
   return res;
 }
 
-function makeM4aMetaUdta(title) {
-  if (!title) return new Uint8Array(0);
-  const titleBytes = new TextEncoder().encode(title);
-  const dataAtom = packM4aAtom('data', concatM4aBuffers(new Uint8Array([0, 0, 0, 1, 0, 0, 0, 0]), titleBytes));
-  const namAtom = packM4aAtom('\xA9nam', dataAtom);
-  const ilstAtom = packM4aAtom('ilst', namAtom);
+function makeM4aMetaUdta(metadataOrTitle) {
+  const meta = typeof metadataOrTitle === 'string' ? { title: metadataOrTitle } : (metadataOrTitle || {});
+  const atoms = [];
+
+  function addStringAtom(name, str) {
+    if (!str) return;
+    const strBytes = new TextEncoder().encode(str);
+    const dataPayload = concatM4aBuffers(new Uint8Array([0, 0, 0, 1, 0, 0, 0, 0]), strBytes);
+    const dataAtom = packM4aAtom('data', dataPayload);
+    atoms.push(packM4aAtom(name, dataAtom));
+  }
+
+  addStringAtom('\xA9nam', meta.title);
+  addStringAtom('\xA9ART', meta.artist);
+  addStringAtom('aART', meta.artist);
+  addStringAtom('\xA9alb', meta.album);
+  if (meta.year) addStringAtom('\xA9day', String(meta.year));
+
+  if (meta.imageBytes && meta.imageBytes.length > 0) {
+    const isPng = meta.imageMime && meta.imageMime.includes('png');
+    const typeFlag = isPng ? 14 : 13;
+    const dataPayload = concatM4aBuffers(new Uint8Array([0, 0, 0, typeFlag, 0, 0, 0, 0]), meta.imageBytes);
+    const dataAtom = packM4aAtom('data', dataPayload);
+    atoms.push(packM4aAtom('covr', dataAtom));
+  }
+
+  if (atoms.length === 0) return new Uint8Array(0);
+
+  const ilstPayload = concatM4aBuffers(...atoms);
+  const ilstAtom = packM4aAtom('ilst', ilstPayload);
   const metaPayload = concatM4aBuffers(new Uint8Array([0, 0, 0, 0]), ilstAtom);
   const metaAtom = packM4aAtom('meta', metaPayload);
   return packM4aAtom('udta', metaAtom);
@@ -1420,7 +1571,7 @@ function parseM4aIndexDirect(buffer) {
   };
 }
 
-function sliceM4aDirect({ buffer, sampleSizes, timescale, mvhdTimescale, rawAtoms, partName }) {
+function sliceM4aDirect({ buffer, sampleSizes, timescale, mvhdTimescale, rawAtoms, partName, metadata }) {
   const audioBytes = new Uint8Array(buffer);
   const numSamples = sampleSizes.length;
 
@@ -1480,7 +1631,7 @@ function sliceM4aDirect({ buffer, sampleSizes, timescale, mvhdTimescale, rawAtom
   }
   const newTkhd = packM4aAtom('tkhd', tkhdPayload);
 
-  const udtaBytes = makeM4aMetaUdta(partName);
+  const udtaBytes = makeM4aMetaUdta(metadata || partName);
 
   function assembleMoov(mdatOffset) {
     const stcoPayload = new Uint8Array(12);
@@ -2835,6 +2986,15 @@ async function splitPart(part) {
   try {
     const isM4a = state.index && state.index.format === 'm4a';
 
+    const metadataPayload = {
+      title: part.name,
+      artist: state.metadata?.artist || '',
+      album: state.metadata?.album || '',
+      year: state.metadata?.year || '',
+      imageBytes: state.metadata?.coverBytes || null,
+      imageMime: state.metadata?.coverMime || null,
+    };
+
     if (isM4a) {
       const frameOffsets = state.index.frameOffsets;
       const sampleSizes = state.index.sampleSizes;
@@ -2865,6 +3025,7 @@ async function splitPart(part) {
                 rawAtoms: state.index.rawAtoms,
                 partName: part.name,
                 id: part.id,
+                metadata: metadataPayload,
               },
             },
             [sliceBuffer]
@@ -2885,6 +3046,7 @@ async function splitPart(part) {
             mvhdTimescale: state.index.mvhdTimescale,
             rawAtoms: state.index.rawAtoms,
             partName: part.name,
+            metadata: metadataPayload,
           });
           onSliceComplete(part.id, part.name, slicedBuffer);
         } catch (err) {
@@ -2920,6 +3082,7 @@ async function splitPart(part) {
               endByte: sliceBuffer.byteLength,
               partName: part.name,
               id: part.id,
+              metadata: metadataPayload,
             },
           },
           [sliceBuffer]
@@ -2938,6 +3101,7 @@ async function splitPart(part) {
           startByte,
           endByte,
           partName: part.name,
+          metadata: metadataPayload,
         });
         onSliceComplete(part.id, part.name, slicedBuffer);
       } catch (err) {
@@ -3060,6 +3224,319 @@ async function handleInstallClick() {
 // =============================================================================
 // Dialog & UI State Helpers
 // =============================================================================
+let tempModalCover = {
+  bytes: null,
+  mime: null,
+  dataUrl: null,
+};
+
+function openEditTagsDialog() {
+  if (!state.file) return;
+
+  state.ui.dialog = 'editTags';
+
+  tempModalCover = {
+    bytes: state.metadata.coverBytes,
+    mime: state.metadata.coverMime,
+    dataUrl: state.metadata.coverDataUrl,
+  };
+
+  if (elements.inputTagArtist) {
+    elements.inputTagArtist.value = state.metadata.artist || '';
+  }
+  if (elements.inputTagAlbum) {
+    elements.inputTagAlbum.value = state.metadata.album || '';
+  }
+  if (elements.inputTagYear) {
+    elements.inputTagYear.value = state.metadata.year || '';
+  }
+
+  updateModalCoverView();
+
+  if (elements.editTagsModal) {
+    elements.editTagsModal.classList.add('open');
+  }
+}
+
+function processCoverImageFile(file) {
+  if (!file || !file.type.startsWith('image/')) {
+    showSnackbar('Please select a valid image file (JPG, PNG, WEBP).');
+    return;
+  }
+
+  const objectUrl = URL.createObjectURL(file);
+  const img = new Image();
+  img.onload = () => {
+    URL.revokeObjectURL(objectUrl);
+
+    // Limit maximum dimensions to 500x500 to keep exported audio files lightweight (~40-60KB)
+    const maxDim = 500;
+    let targetW = img.width;
+    let targetH = img.height;
+
+    if (targetW > maxDim || targetH > maxDim) {
+      if (targetW > targetH) {
+        targetH = Math.round((targetH * maxDim) / targetW);
+        targetW = maxDim;
+      } else {
+        targetW = Math.round((targetW * maxDim) / targetH);
+        targetH = maxDim;
+      }
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = targetW;
+    canvas.height = targetH;
+    const ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, targetW, targetH);
+
+    const isPng = file.type === 'image/png';
+    const outputMime = isPng ? 'image/png' : 'image/jpeg';
+    const outputQuality = isPng ? undefined : 0.85;
+
+    canvas.toBlob(
+      async (blob) => {
+        if (!blob) {
+          showSnackbar('Failed to process cover image.');
+          return;
+        }
+
+        const arrayBuf = await blob.arrayBuffer();
+        const bytes = new Uint8Array(arrayBuf);
+        const dataUrl = URL.createObjectURL(blob);
+
+        if (tempModalCover.dataUrl && tempModalCover.dataUrl !== state.metadata.coverDataUrl) {
+          try { URL.revokeObjectURL(tempModalCover.dataUrl); } catch (_) {}
+        }
+
+        tempModalCover = {
+          bytes,
+          mime: outputMime,
+          dataUrl,
+        };
+
+        updateModalCoverView();
+      },
+      outputMime,
+      outputQuality
+    );
+  };
+
+  img.onerror = () => {
+    URL.revokeObjectURL(objectUrl);
+    showSnackbar('Could not load image. Please try another file.');
+  };
+
+  img.src = objectUrl;
+}
+
+function updateModalCoverView() {
+  if (tempModalCover.dataUrl) {
+    if (elements.modalCoverImg) {
+      elements.modalCoverImg.src = tempModalCover.dataUrl;
+      elements.modalCoverImg.classList.remove('hidden');
+    }
+    if (elements.modalCoverPlaceholder) {
+      elements.modalCoverPlaceholder.classList.add('hidden');
+    }
+    if (elements.btnRemoveCoverArt) {
+      elements.btnRemoveCoverArt.classList.remove('hidden');
+    }
+  } else {
+    if (elements.modalCoverImg) {
+      elements.modalCoverImg.src = '';
+      elements.modalCoverImg.classList.add('hidden');
+    }
+    if (elements.modalCoverPlaceholder) {
+      elements.modalCoverPlaceholder.classList.remove('hidden');
+    }
+    if (elements.btnRemoveCoverArt) {
+      elements.btnRemoveCoverArt.classList.add('hidden');
+    }
+  }
+}
+
+function removeCoverArtInModal() {
+  if (tempModalCover.dataUrl && tempModalCover.dataUrl !== state.metadata.coverDataUrl) {
+    try { URL.revokeObjectURL(tempModalCover.dataUrl); } catch (_) {}
+  }
+  tempModalCover = { bytes: null, mime: null, dataUrl: null };
+  if (elements.coverArtFileInput) {
+    elements.coverArtFileInput.value = '';
+  }
+  updateModalCoverView();
+}
+
+function saveEditTags() {
+  if (elements.inputTagArtist) {
+    state.metadata.artist = elements.inputTagArtist.value.trim();
+  }
+  if (elements.inputTagAlbum) {
+    state.metadata.album = elements.inputTagAlbum.value.trim();
+  }
+  if (elements.inputTagYear) {
+    state.metadata.year = elements.inputTagYear.value.trim();
+  }
+
+  // Update cover artwork
+  if (tempModalCover.dataUrl !== state.metadata.coverDataUrl) {
+    if (state.metadata.coverDataUrl && !state.metadata.isOriginalCoverUrl) {
+      try { URL.revokeObjectURL(state.metadata.coverDataUrl); } catch (_) {}
+    }
+    state.metadata.coverBytes = tempModalCover.bytes;
+    state.metadata.coverMime = tempModalCover.mime;
+    state.metadata.coverDataUrl = tempModalCover.dataUrl;
+    state.metadata.isOriginalCoverUrl = false;
+  }
+
+  updateMainCardCoverView();
+  closeDialog();
+  showSnackbar('Tags and cover artwork updated!');
+}
+
+function updateMainCardCoverView() {
+  if (state.metadata.coverDataUrl) {
+    if (elements.fileCoverImg) {
+      elements.fileCoverImg.src = state.metadata.coverDataUrl;
+      elements.fileCoverImg.classList.remove('hidden');
+    }
+    if (elements.fileDefaultIcon) {
+      elements.fileDefaultIcon.classList.add('hidden');
+    }
+  } else {
+    if (elements.fileCoverImg) {
+      elements.fileCoverImg.src = '';
+      elements.fileCoverImg.classList.add('hidden');
+    }
+    if (elements.fileDefaultIcon) {
+      elements.fileDefaultIcon.classList.remove('hidden');
+    }
+  }
+
+  if (elements.fileSubtext) {
+    if (state.metadata.artist || state.metadata.album) {
+      const parts = [];
+      if (state.metadata.artist) parts.push(state.metadata.artist);
+      if (state.metadata.album) parts.push(state.metadata.album);
+      elements.fileSubtext.textContent = parts.join(' • ');
+      elements.fileSubtext.title = parts.join(' • ');
+    } else {
+      elements.fileSubtext.textContent = 'Indexed & ready to split';
+      elements.fileSubtext.title = 'Indexed & ready to split';
+    }
+  }
+}
+
+function extractMp3Metadata(buffer) {
+  const bytes = new Uint8Array(buffer);
+  if (bytes.length < 10 || bytes[0] !== 0x49 || bytes[1] !== 0x44 || bytes[2] !== 0x33) {
+    return null;
+  }
+  const version = bytes[3];
+  const tagSize = ((bytes[6] & 0x7f) << 21) | ((bytes[7] & 0x7f) << 14) | ((bytes[8] & 0x7f) << 7) | (bytes[9] & 0x7f);
+  const end = Math.min(10 + tagSize, bytes.length);
+
+  let pos = 10;
+  const tags = {};
+
+  while (pos + 10 <= end) {
+    if (bytes[pos] === 0) break;
+    const id = String.fromCharCode(bytes[pos], bytes[pos + 1], bytes[pos + 2], bytes[pos + 3]);
+    let frameSize = 0;
+    if (version === 4) {
+      frameSize = ((bytes[pos + 4] & 0x7f) << 21) | ((bytes[pos + 5] & 0x7f) << 14) | ((bytes[pos + 6] & 0x7f) << 7) | (bytes[pos + 7] & 0x7f);
+    } else {
+      frameSize = (bytes[pos + 4] << 24) | (bytes[pos + 5] << 16) | (bytes[pos + 6] << 8) | bytes[pos + 7];
+    }
+    if (frameSize <= 0 || pos + 10 + frameSize > end) break;
+    const payload = bytes.subarray(pos + 10, pos + 10 + frameSize);
+    pos += 10 + frameSize;
+
+    if (id === 'TIT2' || id === 'TPE1' || id === 'TALB' || id === 'TYER' || id === 'TDRC') {
+      const enc = payload[0];
+      const textBytes = payload.subarray(1);
+      let text = '';
+      try {
+        if (enc === 0 || enc === 3) {
+          text = new TextDecoder(enc === 3 ? 'utf-8' : 'iso-8859-1').decode(textBytes).replace(/\0+$/, '');
+        } else if (enc === 1 || enc === 2) {
+          text = new TextDecoder('utf-16').decode(textBytes).replace(/\0+$/, '');
+        }
+      } catch (_) {}
+      if (id === 'TIT2') tags.title = text;
+      else if (id === 'TPE1') tags.artist = text;
+      else if (id === 'TALB') tags.album = text;
+      else if (id === 'TYER' || id === 'TDRC') tags.year = text.slice(0, 4);
+    } else if (id === 'APIC') {
+      try {
+        const enc = payload[0];
+        let p = 1;
+        let mime = '';
+        while (p < payload.length && payload[p] !== 0) mime += String.fromCharCode(payload[p++]);
+        p++; // skip null
+        const picType = payload[p++];
+        if (enc === 0 || enc === 3) {
+          while (p < payload.length && payload[p] !== 0) p++;
+          p++;
+        } else {
+          while (p + 1 < payload.length && !(payload[p] === 0 && payload[p + 1] === 0)) p += 2;
+          p += 2;
+        }
+        if (p < payload.length) {
+          const imgData = payload.subarray(p);
+          tags.coverBytes = imgData;
+          tags.coverMime = mime || 'image/jpeg';
+        }
+      } catch (_) {}
+    }
+  }
+  return tags;
+}
+
+function extractM4aMetadata(buffer) {
+  const bytes = new Uint8Array(buffer);
+  const view = new DataView(buffer);
+  try {
+    const topAtoms = parseM4aAtoms(bytes, view, 0, bytes.length);
+    const moov = topAtoms.find((a) => a.name === 'moov');
+    if (!moov) return null;
+    const moovAtoms = parseM4aAtoms(bytes, view, moov.payloadStart, moov.payloadEnd);
+    const udta = moovAtoms.find((a) => a.name === 'udta');
+    if (!udta) return null;
+    const udtaAtoms = parseM4aAtoms(bytes, view, udta.payloadStart, udta.payloadEnd);
+    const meta = udtaAtoms.find((a) => a.name === 'meta');
+    if (!meta) return null;
+    const ilst = parseM4aAtoms(bytes, view, meta.payloadStart + 4, meta.payloadEnd).find((a) => a.name === 'ilst');
+    if (!ilst) return null;
+
+    const tagAtoms = parseM4aAtoms(bytes, view, ilst.payloadStart, ilst.payloadEnd);
+    const tags = {};
+    for (const atom of tagAtoms) {
+      const dataAtoms = parseM4aAtoms(bytes, view, atom.payloadStart, atom.payloadEnd);
+      const data = dataAtoms.find((a) => a.name === 'data');
+      if (!data || data.payloadStart + 8 > data.payloadEnd) continue;
+      const type = view.getUint32(data.payloadStart);
+      const content = bytes.subarray(data.payloadStart + 8, data.payloadEnd);
+      if (atom.name === 'covr') {
+        tags.coverMime = type === 14 ? 'image/png' : 'image/jpeg';
+        tags.coverBytes = content;
+      } else {
+        const text = new TextDecoder('utf-8').decode(content).replace(/\0+$/, '');
+        if (atom.name === '\xA9nam') tags.title = text;
+        else if (atom.name === '\xA9ART') tags.artist = text;
+        else if (atom.name === 'aART' && !tags.artist) tags.artist = text;
+        else if (atom.name === '\xA9alb') tags.album = text;
+        else if (atom.name === '\xA9day') tags.year = text.slice(0, 4);
+      }
+    }
+    return tags;
+  } catch (_) {
+    return null;
+  }
+}
+
 function openFileInfoDialog() {
   if (!state.file || !state.index) return;
 
@@ -3111,7 +3588,7 @@ function showFormatErrorModal(fileName, formatName, details = null) {
     <div style="margin-bottom: 12px;">
       <div style="font-size: 0.8125rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--md-sys-color-on-surface-variant); margin-bottom: 4px;">Detected format</div>
       <div style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 6px; background: rgba(239, 68, 68, 0.18); border: 1px solid rgba(239, 68, 68, 0.35); color: #fca5a5; font-weight: 600; font-size: 0.875rem;">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="10" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
         <span>${escapeHtml(displayFormat)}</span>
       </div>
     </div>
@@ -3138,6 +3615,7 @@ function closeDialog() {
   if (elements.fileInfoDialog) elements.fileInfoDialog.classList.remove('open');
   if (elements.iosInstallModal) elements.iosInstallModal.classList.remove('open');
   if (elements.formatErrorModal) elements.formatErrorModal.classList.remove('open');
+  if (elements.editTagsModal) elements.editTagsModal.classList.remove('open');
   closeTimeWheel();
   state.ui.dialog = null;
   if (state.ui.previewId) {
@@ -3174,6 +3652,7 @@ function hideLoading() {
 function enableActionButtons() {
   if (elements.btnOpenAuto) elements.btnOpenAuto.disabled = false;
   if (elements.btnOpenRange) elements.btnOpenRange.disabled = false;
+  if (elements.btnOpenEditTags) elements.btnOpenEditTags.disabled = false;
   if (elements.btnOpenFileInfo) elements.btnOpenFileInfo.disabled = false;
   if (elements.btnPlayWholeFile) elements.btnPlayWholeFile.disabled = false;
   if (elements.btnChangeFile) elements.btnChangeFile.style.pointerEvents = 'auto';
@@ -3182,6 +3661,7 @@ function enableActionButtons() {
 function disableActionButtons() {
   if (elements.btnOpenAuto) elements.btnOpenAuto.disabled = true;
   if (elements.btnOpenRange) elements.btnOpenRange.disabled = true;
+  if (elements.btnOpenEditTags) elements.btnOpenEditTags.disabled = true;
   if (elements.btnOpenFileInfo) elements.btnOpenFileInfo.disabled = true;
   if (elements.btnPlayWholeFile) elements.btnPlayWholeFile.disabled = true;
   if (elements.btnChangeFile) elements.btnChangeFile.style.pointerEvents = 'none';
