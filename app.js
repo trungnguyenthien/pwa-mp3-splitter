@@ -1093,8 +1093,16 @@ function drawWaveform() {
   const centerY = h / 2;
   const maxBarHeight = (h - 16) / 2;
 
-  const isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const barColor = isDark ? '#D0BCFF' : '#6750A4';
+  // DAW center zero-level guideline
+  ctx.strokeStyle = '#22252D';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, centerY);
+  ctx.lineTo(w, centerY);
+  ctx.stroke();
+
+  // WavePad electric green waveform
+  const barColor = '#00E676';
   ctx.fillStyle = barColor;
 
   for (let b = 0; b < numBars; b++) {
@@ -1115,10 +1123,10 @@ function drawWaveform() {
     const endX = (part.end / state.index.duration) * w;
     const partWidth = Math.max(2, endX - startX);
 
-    ctx.fillStyle = 'rgba(125, 82, 96, 0.18)';
+    ctx.fillStyle = 'rgba(0, 230, 118, 0.12)';
     ctx.fillRect(startX, 0, partWidth, h);
 
-    ctx.strokeStyle = 'rgba(125, 82, 96, 0.7)';
+    ctx.strokeStyle = 'rgba(0, 230, 118, 0.55)';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.moveTo(startX, 0);
@@ -1127,14 +1135,14 @@ function drawWaveform() {
     ctx.lineTo(endX, h);
     ctx.stroke();
 
-    ctx.fillStyle = isDark ? '#FFD8E4' : '#7D5260';
-    ctx.font = '600 10px Roboto, sans-serif';
+    ctx.fillStyle = '#00E676';
+    ctx.font = '600 10px Inter, -apple-system, sans-serif';
     ctx.fillText(`#${index + 1} ${part.name}`, startX + 4, 14);
   });
 
   // Draw suggested cut lines on waveform when Auto Split dialog is open
   if (state.ui.dialog === 'auto' && state.suggestions.length > 1) {
-    ctx.strokeStyle = isDark ? '#EFB8C8' : '#B3261E';
+    ctx.strokeStyle = '#FF3344';
     ctx.lineWidth = 1.5;
     ctx.setLineDash([4, 3]);
 
@@ -1147,8 +1155,8 @@ function drawWaveform() {
       ctx.lineTo(x, h);
       ctx.stroke();
 
-      ctx.fillStyle = isDark ? '#EFB8C8' : '#B3261E';
-      ctx.font = '600 9px Roboto, sans-serif';
+      ctx.fillStyle = '#FF5252';
+      ctx.font = '600 9px Inter, -apple-system, sans-serif';
       ctx.fillText(`✂ ${formatTime(cutSec)}`, Math.min(w - 48, x + 3), 28);
     }
     ctx.setLineDash([]);

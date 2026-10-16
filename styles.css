@@ -1,61 +1,61 @@
 /* ==========================================================================
-   MP3 Splitter PWA — Material Design 3 Design System
+   MP3 Splitter PWA — Pro Audio DAW Dark Design System (WavePad Style)
    ========================================================================== */
 
 :root {
-  /* MD3 Light Color Roles */
-  --md-sys-color-primary: #6750A4;
-  --md-sys-color-on-primary: #FFFFFF;
-  --md-sys-color-primary-container: #EADDFF;
-  --md-sys-color-on-primary-container: #21005D;
-  --md-sys-color-secondary: #625B71;
-  --md-sys-color-on-secondary: #FFFFFF;
-  --md-sys-color-secondary-container: #E8DEF8;
-  --md-sys-color-on-secondary-container: #1D192B;
-  --md-sys-color-tertiary: #7D5260;
-  --md-sys-color-on-tertiary: #FFFFFF;
-  --md-sys-color-tertiary-container: #FFD8E4;
-  --md-sys-color-on-tertiary-container: #31111D;
-  --md-sys-color-error: #B3261E;
-  --md-sys-color-on-error: #FFFFFF;
-  --md-sys-color-error-container: #F9DEDC;
-  --md-sys-color-on-error-container: #410E0B;
-  --md-sys-color-background: #FEF7FF;
-  --md-sys-color-on-background: #1D1B20;
-  --md-sys-color-surface: #FFFFFF;
-  --md-sys-color-on-surface: #1D1B20;
-  --md-sys-color-surface-variant: #F4EFF4;
-  --md-sys-color-on-surface-variant: #49454F;
-  --md-sys-color-outline: #CAC4D0;
-  --md-sys-color-outline-variant: #E7E0EC;
-  --md-sys-color-success: #2E7D32;
-  --md-sys-color-success-container: #C8E6C9;
-  --md-sys-color-on-success-container: #0B3310;
+  /* Studio DAW Pro Dark Theme (inspired by WavePad / Digital Audio Workstations) */
+  --md-sys-color-primary: #00E676;               /* Electric Audio Green */
+  --md-sys-color-on-primary: #041a0b;            /* High-contrast dark text on green */
+  --md-sys-color-primary-container: #10381e;    /* Deep forest container */
+  --md-sys-color-on-primary-container: #69F0AE; /* Bright emerald text */
+  --md-sys-color-secondary: #90A4AE;             /* Studio cool slate */
+  --md-sys-color-on-secondary: #0D1619;
+  --md-sys-color-secondary-container: #262B33;   /* Slate container for tonal buttons */
+  --md-sys-color-on-secondary-container: #ECEFF1;
+  --md-sys-color-tertiary: #00B0FF;              /* Precision Cyan / Marker accent */
+  --md-sys-color-on-tertiary: #002238;
+  --md-sys-color-tertiary-container: #003657;
+  --md-sys-color-on-tertiary-container: #B3E5FC;
+  --md-sys-color-error: #FF5252;                 /* Studio red (clip / warning) */
+  --md-sys-color-on-error: #3D0000;
+  --md-sys-color-error-container: #5C0B0B;
+  --md-sys-color-on-error-container: #FFCDD2;
+  --md-sys-color-background: #141518;            /* Studio dark background */
+  --md-sys-color-on-background: #ECEFF1;         /* Crisp studio light text */
+  --md-sys-color-surface: #1E2025;               /* Card / Panel surface */
+  --md-sys-color-on-surface: #ECEFF1;
+  --md-sys-color-surface-variant: #252830;       /* Recessed / alternate surface */
+  --md-sys-color-on-surface-variant: #A0A5B2;    /* Secondary label text */
+  --md-sys-color-outline: #3B3E4A;               /* Distinct metallic panel outline */
+  --md-sys-color-outline-variant: #2A2C35;       /* Subtle separator outline */
+  --md-sys-color-success: #00E676;               /* Neon Green */
+  --md-sys-color-success-container: #10381e;
+  --md-sys-color-on-success-container: #69F0AE;
   --md-sys-color-scrim: #000000;
-  --md-sys-color-inverse-surface: #313033;
-  --md-sys-color-inverse-on-surface: #F4EFF4;
-  --md-sys-color-inverse-primary: #D0BCFF;
+  --md-sys-color-inverse-surface: #ECEFF1;
+  --md-sys-color-inverse-on-surface: #141518;
+  --md-sys-color-inverse-primary: #00C853;
 
-  /* Waveform overlay & selection colors */
-  --waveform-bg: #F4EFF4;
-  --waveform-wave: #6750A4;
-  --waveform-progress: #7D5260;
-  --waveform-overlay: rgba(103, 80, 164, 0.16);
-  --waveform-overlay-border: rgba(103, 80, 164, 0.5);
+  /* Waveform overlay & selection colors matching style.png */
+  --waveform-bg: #0D0E11;                        /* Deep audio black canvas */
+  --waveform-wave: #00E676;                      /* Glowing electric green waveform */
+  --waveform-progress: #FF3344;                  /* Vibrant studio red playhead & progress */
+  --waveform-overlay: rgba(0, 230, 118, 0.14);  /* Subtle green part highlight */
+  --waveform-overlay-border: rgba(0, 230, 118, 0.55);
 
   /* Elevations */
   --elevation-0: none;
-  --elevation-1: 0 1px 3px 1px rgba(0, 0, 0, 0.15), 0 1px 2px 0 rgba(0, 0, 0, 0.3);
-  --elevation-2: 0 2px 6px 2px rgba(0, 0, 0, 0.15), 0 1px 2px 0 rgba(0, 0, 0, 0.3);
-  --elevation-3: 0 4px 8px 3px rgba(0, 0, 0, 0.15), 0 1px 3px 0 rgba(0, 0, 0, 0.3);
+  --elevation-1: 0 1px 3px rgba(0, 0, 0, 0.4), 0 1px 2px rgba(0, 0, 0, 0.5);
+  --elevation-2: 0 4px 10px rgba(0, 0, 0, 0.5), 0 2px 4px rgba(0, 0, 0, 0.6);
+  --elevation-3: 0 8px 24px rgba(0, 0, 0, 0.6), 0 4px 8px rgba(0, 0, 0, 0.7);
 
   /* Typography & Layout */
-  --font-family: Roboto, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   --radius-xs: 4px;
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 16px;
-  --radius-xl: 28px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
   --radius-full: 9999px;
 
   --safe-top: env(safe-area-inset-top, 0px);
@@ -64,83 +64,22 @@
   --safe-right: env(safe-area-inset-right, 0px);
 }
 
-/* Dark Mode Palette */
 @media (prefers-color-scheme: dark) {
   :root {
-    --md-sys-color-primary: #D0BCFF;
-    --md-sys-color-on-primary: #381E72;
-    --md-sys-color-primary-container: #4F378B;
-    --md-sys-color-on-primary-container: #EADDFF;
-    --md-sys-color-secondary: #CCC2DC;
-    --md-sys-color-on-secondary: #332D41;
-    --md-sys-color-secondary-container: #4A4458;
-    --md-sys-color-on-secondary-container: #E8DEF8;
-    --md-sys-color-tertiary: #EFB8C8;
-    --md-sys-color-on-tertiary: #492532;
-    --md-sys-color-tertiary-container: #633B48;
-    --md-sys-color-on-tertiary-container: #FFD8E4;
-    --md-sys-color-error: #F2B8B5;
-    --md-sys-color-on-error: #601410;
-    --md-sys-color-error-container: #8C1D18;
-    --md-sys-color-on-error-container: #F9DEDC;
-    --md-sys-color-background: #141218;
-    --md-sys-color-on-background: #E6E0E9;
-    --md-sys-color-surface: #1D1B20;
-    --md-sys-color-on-surface: #E6E0E9;
-    --md-sys-color-surface-variant: #2B2930;
-    --md-sys-color-on-surface-variant: #CAC4D0;
-    --md-sys-color-outline: #938F99;
-    --md-sys-color-outline-variant: #49454F;
-    --md-sys-color-success: #81C784;
-    --md-sys-color-success-container: #1B5E20;
-    --md-sys-color-on-success-container: #C8E6C9;
-    --md-sys-color-inverse-surface: #E6E0E9;
-    --md-sys-color-inverse-on-surface: #313033;
-    --md-sys-color-inverse-primary: #6750A4;
-
-    --waveform-bg: #2B2930;
-    --waveform-wave: #D0BCFF;
-    --waveform-progress: #EFB8C8;
-    --waveform-overlay: rgba(208, 188, 255, 0.2);
-    --waveform-overlay-border: rgba(208, 188, 255, 0.6);
+    --md-sys-color-background: #121316;
+    --md-sys-color-surface: #1A1C21;
+    --md-sys-color-surface-variant: #22242B;
+    --md-sys-color-outline: #323540;
+    --md-sys-color-outline-variant: #252730;
   }
 }
 
-/* Explicit Dark Theme override if toggled */
 [data-theme="dark"] {
-  --md-sys-color-primary: #D0BCFF;
-  --md-sys-color-on-primary: #381E72;
-  --md-sys-color-primary-container: #4F378B;
-  --md-sys-color-on-primary-container: #EADDFF;
-  --md-sys-color-secondary: #CCC2DC;
-  --md-sys-color-on-secondary: #332D41;
-  --md-sys-color-secondary-container: #4A4458;
-  --md-sys-color-on-secondary-container: #E8DEF8;
-  --md-sys-color-tertiary: #EFB8C8;
-  --md-sys-color-on-tertiary: #492532;
-  --md-sys-color-tertiary-container: #633B48;
-  --md-sys-color-on-tertiary-container: #FFD8E4;
-  --md-sys-color-error: #F2B8B5;
-  --md-sys-color-on-error: #601410;
-  --md-sys-color-error-container: #8C1D18;
-  --md-sys-color-on-error-container: #F9DEDC;
-  --md-sys-color-background: #141218;
-  --md-sys-color-on-background: #E6E0E9;
-  --md-sys-color-surface: #1D1B20;
-  --md-sys-color-on-surface: #E6E0E9;
-  --md-sys-color-surface-variant: #2B2930;
-  --md-sys-color-on-surface-variant: #CAC4D0;
-  --md-sys-color-outline: #938F99;
-  --md-sys-color-outline-variant: #49454F;
-  --md-sys-color-success: #81C784;
-  --md-sys-color-success-container: #1B5E20;
-  --md-sys-color-on-success-container: #C8E6C9;
-
-  --waveform-bg: #2B2930;
-  --waveform-wave: #D0BCFF;
-  --waveform-progress: #EFB8C8;
-  --waveform-overlay: rgba(208, 188, 255, 0.2);
-  --waveform-overlay-border: rgba(208, 188, 255, 0.6);
+  --md-sys-color-background: #121316;
+  --md-sys-color-surface: #1A1C21;
+  --md-sys-color-surface-variant: #22242B;
+  --md-sys-color-outline: #323540;
+  --md-sys-color-outline-variant: #252730;
 }
 
 /* Reset & Box Sizing */
@@ -287,23 +226,27 @@ body {
 }
 
 .btn-primary {
-  background-color: var(--md-sys-color-primary);
-  color: var(--md-sys-color-on-primary);
-  box-shadow: var(--elevation-1);
+  background: linear-gradient(180deg, #00F576 0%, #00C853 100%);
+  color: #041a0b;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgba(0, 230, 118, 0.3);
 }
 
 .btn-primary:hover:not(:disabled) {
-  box-shadow: var(--elevation-2);
-  filter: brightness(1.06);
+  box-shadow: 0 4px 14px rgba(0, 230, 118, 0.45);
+  filter: brightness(1.08);
 }
 
 .btn-tonal {
   background-color: var(--md-sys-color-secondary-container);
   color: var(--md-sys-color-on-secondary-container);
+  border: 1px solid var(--md-sys-color-outline-variant);
 }
 
 .btn-tonal:hover:not(:disabled) {
-  filter: brightness(0.96);
+  background-color: #313642;
+  border-color: var(--md-sys-color-outline);
+  color: #ffffff;
 }
 
 .btn-outlined {
@@ -313,7 +256,8 @@ body {
 }
 
 .btn-outlined:hover:not(:disabled) {
-  background-color: rgba(103, 80, 164, 0.08);
+  background-color: rgba(0, 230, 118, 0.1);
+  border-color: var(--md-sys-color-primary);
 }
 
 .btn-text {
@@ -324,7 +268,7 @@ body {
 }
 
 .btn-text:hover:not(:disabled) {
-  background-color: rgba(103, 80, 164, 0.08);
+  background-color: rgba(0, 230, 118, 0.1);
 }
 
 .btn-sm {
@@ -401,7 +345,7 @@ body {
 .dropzone:hover,
 .dropzone.drag-over {
   border-color: var(--md-sys-color-primary);
-  background-color: rgba(103, 80, 164, 0.08);
+  background-color: rgba(0, 230, 118, 0.08);
 }
 
 .dropzone-icon {
@@ -649,15 +593,23 @@ body {
   align-items: center;
   gap: 8px;
   font-size: 0.875rem;
+  background-color: #0d0e11;
+  padding: 4px 10px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
 }
 
 .current-time {
-  font-weight: 600;
+  font-weight: 700;
   color: var(--md-sys-color-primary);
+  letter-spacing: 0.04em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 .total-time {
   color: var(--md-sys-color-on-surface-variant);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 .canvas-wrapper {
@@ -668,7 +620,8 @@ body {
   border-radius: var(--radius-sm);
   overflow: hidden;
   cursor: pointer;
-  border: 1px solid var(--md-sys-color-outline-variant);
+  border: 1px solid var(--md-sys-color-outline);
+  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.7);
 }
 
 #waveformCanvas {
@@ -710,8 +663,8 @@ body {
   top: 0;
   bottom: 0;
   width: 2px;
-  background-color: var(--md-sys-color-primary);
-  box-shadow: 0 0 6px rgba(103, 80, 164, 0.6);
+  background-color: #FF3344;
+  box-shadow: 0 0 8px rgba(255, 51, 68, 0.85);
   pointer-events: none;
   z-index: 7;
 }
@@ -723,8 +676,9 @@ body {
   left: -5px;
   width: 12px;
   height: 12px;
-  background-color: var(--md-sys-color-primary);
+  background-color: #FF3344;
   border-radius: var(--radius-full);
+  box-shadow: 0 0 6px rgba(255, 51, 68, 0.8);
 }
 
 /* Action Row (Auto / Time Range) */
@@ -1011,6 +965,7 @@ body {
 
 .dialog-panel {
   background-color: var(--md-sys-color-surface);
+  border: 1px solid var(--md-sys-color-outline);
   border-radius: var(--radius-xl);
   width: 100%;
   max-width: 560px;
@@ -1089,7 +1044,7 @@ body {
   }
 }
 
-/* Form inputs */
+/* Form inputs & Range Sliders */
 .form-group {
   display: flex;
   flex-direction: column;
@@ -1107,17 +1062,60 @@ body {
   padding: 0 16px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--md-sys-color-outline);
-  background-color: var(--md-sys-color-surface);
+  background-color: var(--md-sys-color-surface-variant);
   color: var(--md-sys-color-on-surface);
   font-family: inherit;
   font-size: 1rem;
-  transition: border-color 0.15s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .input-text:focus {
   border-color: var(--md-sys-color-primary);
-  border-width: 2px;
+  box-shadow: 0 0 0 3px rgba(0, 230, 118, 0.2);
   outline: none;
+}
+
+/* DAW Sliders */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  background: #0D0E11;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  border-radius: var(--radius-full);
+  outline: none;
+  cursor: pointer;
+  margin: 8px 0;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--md-sys-color-primary);
+  border: 2px solid #0D0E11;
+  box-shadow: 0 0 8px rgba(0, 230, 118, 0.6);
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover,
+input[type="range"]:focus-visible::-webkit-slider-thumb {
+  transform: scale(1.2);
+  box-shadow: 0 0 12px rgba(0, 230, 118, 0.9);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--md-sys-color-primary);
+  border: 2px solid #0D0E11;
+  box-shadow: 0 0 8px rgba(0, 230, 118, 0.6);
+  cursor: pointer;
 }
 
 .form-helper {
@@ -1170,17 +1168,18 @@ body {
 
 .btn-icon.is-playing {
   color: var(--md-sys-color-primary);
-  background-color: rgba(103, 80, 164, 0.15);
+  background-color: rgba(0, 230, 118, 0.18);
+  box-shadow: 0 0 8px rgba(0, 230, 118, 0.35);
 }
 
 @media (prefers-color-scheme: dark) {
   .btn-icon.is-playing {
-    background-color: rgba(208, 188, 255, 0.22);
+    background-color: rgba(0, 230, 118, 0.22);
   }
 }
 
 [data-theme="dark"] .btn-icon.is-playing {
-  background-color: rgba(208, 188, 255, 0.22);
+  background-color: rgba(0, 230, 118, 0.22);
 }
 
 .suggestion-info {
@@ -1274,10 +1273,11 @@ body {
 }
 
 .preset-chip.active {
-  background-color: var(--md-sys-color-secondary-container);
-  color: var(--md-sys-color-on-secondary-container);
-  border-color: var(--md-sys-color-secondary);
+  background-color: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-primary);
+  border-color: var(--md-sys-color-primary);
   font-weight: 600;
+  box-shadow: 0 0 8px rgba(0, 230, 118, 0.25);
 }
 
 /* Snackbar / Toast */
