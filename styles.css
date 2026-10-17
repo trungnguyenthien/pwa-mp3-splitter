@@ -1777,7 +1777,8 @@ input[type="range"]::-moz-range-thumb {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 8px 10px;
+  padding: 10px 12px;
+  min-height: 68px;
   background-color: #13151b;
   border: 1.5px solid #252832;
   border-radius: var(--radius-md);
@@ -1789,6 +1790,11 @@ input[type="range"]::-moz-range-thumb {
   text-align: center;
 }
 
+.time-card:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
+}
+
 .time-card:hover {
   border-color: #3b3f4e;
   background-color: #171a22;
@@ -1797,16 +1803,16 @@ input[type="range"]::-moz-range-thumb {
 .time-card.active {
   background-color: #0b2314;
   border-color: var(--md-sys-color-primary);
-  box-shadow: 0 0 12px rgba(0, 230, 118, 0.22), inset 0 1px 1px rgba(0, 230, 118, 0.2);
+  box-shadow: 0 0 14px rgba(0, 230, 118, 0.25), inset 0 1px 1px rgba(0, 230, 118, 0.25);
 }
 
 .time-card-header {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 6px;
   width: 100%;
-  margin-bottom: 2px;
+  margin-bottom: 4px;
 }
 
 .time-card-dot {
@@ -1825,7 +1831,7 @@ input[type="range"]::-moz-range-thumb {
 .time-card-title {
   font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.05em;
   color: var(--md-sys-color-on-surface-variant);
   transition: color 0.2s ease;
 }
@@ -1834,57 +1840,39 @@ input[type="range"]::-moz-range-thumb {
   color: var(--md-sys-color-primary);
 }
 
-.time-card-badge {
-  font-size: 0.65rem;
-  color: #646a7a;
-  text-transform: uppercase;
-}
-
-.time-card.active .time-card-badge {
-  color: rgba(0, 230, 118, 0.75);
-}
 
 .time-card-input-wrapper {
   width: 100%;
   display: flex;
   justify-content: center;
+  align-items: center;
 }
 
 .time-card-input {
   width: 100%;
-  max-width: 120px;
+  max-width: 140px;
   background: transparent;
   border: none;
   border-radius: 4px;
   color: #d1d5db;
-  font-size: 1.35rem;
-  font-weight: 700;
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
   text-align: center;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  padding: 1px 2px;
+  padding: 0;
   outline: none;
-  transition: color 0.15s ease, background-color 0.15s ease;
+  pointer-events: none;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  transition: color 0.15s ease, text-shadow 0.15s ease;
 }
 
 .time-card.active .time-card-input {
   color: #ffffff;
-  text-shadow: 0 0 8px rgba(0, 230, 118, 0.4);
-}
-
-.time-card-input:focus {
-  background-color: rgba(0, 0, 0, 0.45);
-  box-shadow: 0 0 0 1.5px var(--md-sys-color-primary);
-}
-
-.time-card-sub {
-  font-size: 0.7rem;
-  color: #717786;
-  margin-top: 1px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-}
-
-.time-card.active .time-card-sub {
-  color: #a4adbd;
+  text-shadow: 0 0 10px rgba(0, 230, 118, 0.5);
 }
 
 /* Duration Pill */

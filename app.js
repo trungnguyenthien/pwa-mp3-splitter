@@ -203,8 +203,6 @@ function initElements() {
     cardRangeEnd: document.getElementById('cardRangeEnd'),
     inputRangeStart: document.getElementById('inputRangeStart'),
     inputRangeEnd: document.getElementById('inputRangeEnd'),
-    rangeStartHelper: document.getElementById('rangeStartHelper'),
-    rangeEndHelper: document.getElementById('rangeEndHelper'),
     rangeDurationPill: document.getElementById('rangeDurationPill'),
     rangeDurationText: document.getElementById('rangeDurationText'),
     rangeErrorAlert: document.getElementById('rangeErrorAlert'),
@@ -246,7 +244,7 @@ function initElements() {
 function initWorker() {
   try {
     if (window.Worker && window.location.protocol !== 'file:') {
-      mp3Worker = new Worker('./mp3-worker.js?v=42');
+      mp3Worker = new Worker('./mp3-worker.js?v=44');
       mp3Worker.onmessage = handleWorkerMessage;
       mp3Worker.onerror = (err) => {
         console.warn('Worker error, switching to in-thread processing:', err);
@@ -595,68 +593,34 @@ function initEvents() {
   // Dual Touch Cards for Start & End Time
   if (elements.cardRangeStart) {
     elements.cardRangeStart.addEventListener('click', () => openTimeWheel('start'));
+    elements.cardRangeStart.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openTimeWheel('start');
+      }
+    });
   }
   if (elements.cardRangeEnd) {
     elements.cardRangeEnd.addEventListener('click', () => openTimeWheel('end'));
+    elements.cardRangeEnd.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        openTimeWheel('end');
+      }
+    });
   }
 
+  // Prevent keyboard focus on inputs while keeping clicks routed to wheeler target
   if (elements.inputRangeStart) {
-    elements.inputRangeStart.addEventListener('focus', () => openTimeWheel('start'));
     elements.inputRangeStart.addEventListener('click', (e) => {
       e.stopPropagation();
       openTimeWheel('start');
     });
-    elements.inputRangeStart.addEventListener('input', () => {
-      validateRangeInputs();
-      updateWheelBadges();
-      if (activeWheelTarget === 'start') {
-        const val = parseTimeToSeconds(elements.inputRangeStart.value);
-        if (!isNaN(val)) {
-          scrollToWheelSec(Math.round(val), 'smooth');
-        }
-      }
-    });
-    elements.inputRangeStart.addEventListener('blur', () => {
-      const endVal = parseTimeToSeconds(elements.inputRangeEnd.value) || 0;
-      let val = parseTimeToSeconds(elements.inputRangeStart.value);
-      if (isNaN(val) || val < 0) val = 0;
-      if (val > endVal) val = endVal;
-      elements.inputRangeStart.value = formatMmSs(val);
-      validateRangeInputs();
-      updateWheelBadges();
-      if (activeWheelTarget === 'start') {
-        scrollToWheelSec(val, 'smooth');
-      }
-    });
   }
-
   if (elements.inputRangeEnd) {
-    elements.inputRangeEnd.addEventListener('focus', () => openTimeWheel('end'));
     elements.inputRangeEnd.addEventListener('click', (e) => {
       e.stopPropagation();
       openTimeWheel('end');
-    });
-    elements.inputRangeEnd.addEventListener('input', () => {
-      validateRangeInputs();
-      updateWheelBadges();
-      if (activeWheelTarget === 'end') {
-        const val = parseTimeToSeconds(elements.inputRangeEnd.value);
-        if (!isNaN(val)) {
-          scrollToWheelSec(Math.round(val), 'smooth');
-        }
-      }
-    });
-    elements.inputRangeEnd.addEventListener('blur', () => {
-      const startVal = parseTimeToSeconds(elements.inputRangeStart.value) || 0;
-      let val = parseTimeToSeconds(elements.inputRangeEnd.value);
-      if (isNaN(val) || val < startVal) val = startVal;
-      if (state.index && val > state.index.duration) val = state.index.duration;
-      elements.inputRangeEnd.value = formatMmSs(val);
-      validateRangeInputs();
-      updateWheelBadges();
-      if (activeWheelTarget === 'end') {
-        scrollToWheelSec(val, 'smooth');
-      }
     });
   }
 
@@ -2751,14 +2715,6 @@ function validateRangeInputs() {
     }
   }
 
-  // Display clean mm:ss (NO seconds conversion like 61s)
-  if (elements.rangeStartHelper) {
-    elements.rangeStartHelper.textContent = isNaN(startVal) ? '00:00' : formatMmSs(startVal);
-  }
-
-  if (elements.rangeEndHelper) {
-    elements.rangeEndHelper.textContent = isNaN(endVal) ? '00:00' : formatMmSs(endVal);
-  }
 
   let errorMsg = '';
   const partDuration = endVal - startVal;
