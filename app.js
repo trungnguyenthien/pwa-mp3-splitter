@@ -246,7 +246,7 @@ function initElements() {
 function initWorker() {
   try {
     if (window.Worker && window.location.protocol !== 'file:') {
-      mp3Worker = new Worker('./mp3-worker.js?v=41');
+      mp3Worker = new Worker('./mp3-worker.js?v=42');
       mp3Worker.onmessage = handleWorkerMessage;
       mp3Worker.onerror = (err) => {
         console.warn('Worker error, switching to in-thread processing:', err);
@@ -2615,9 +2615,7 @@ function openTimeWheel(targetField = 'start') {
   const targetInput = targetField === 'start' ? elements.inputRangeStart : elements.inputRangeEnd;
   const currentVal = targetInput ? Math.round(parseTimeToSeconds(targetInput.value) || 0) : 0;
 
-  requestAnimationFrame(() => {
-    scrollToWheelSec(currentVal, 'auto');
-  });
+  scrollToWheelSec(currentVal, 'auto');
 }
 
 function closeTimeWheel() {
@@ -2636,13 +2634,18 @@ function scrollToWheelSec(sec, behavior = 'auto') {
   });
 
   updateSelectedWheelItem(clampedSec);
-  updateWheel3DEffect();
   updateWheelStepButtons();
 
-  if (scrollResetTimeout) clearTimeout(scrollResetTimeout);
-  scrollResetTimeout = setTimeout(() => {
+  if (behavior === 'auto') {
     isProgrammaticWheelScroll = false;
-  }, behavior === 'smooth' ? 300 : 50);
+    updateWheel3DEffect();
+  } else {
+    if (scrollResetTimeout) clearTimeout(scrollResetTimeout);
+    scrollResetTimeout = setTimeout(() => {
+      isProgrammaticWheelScroll = false;
+      updateWheel3DEffect();
+    }, 320);
+  }
 }
 
 function updateSelectedWheelItem(activeSec) {
@@ -2686,7 +2689,7 @@ function stepWheel(delta) {
 }
 
 function onWheelViewportScroll() {
-  if (isProgrammaticWheelScroll || !elements.timeWheelViewport) return;
+  if (!elements.timeWheelViewport) return;
 
   if (wheelScrollRaf) cancelAnimationFrame(wheelScrollRaf);
   wheelScrollRaf = requestAnimationFrame(() => {
@@ -2696,15 +2699,18 @@ function onWheelViewportScroll() {
     const clampedIndex = Math.max(0, Math.min(Math.max(0, count - 1), index));
     const sec = wheelMinSec + clampedIndex;
 
-    const isStart = activeWheelTarget === 'start';
-    const targetInput = isStart ? elements.inputRangeStart : elements.inputRangeEnd;
-    const mmSsVal = formatMmSs(sec);
-    if (targetInput && targetInput.value !== mmSsVal) {
-      targetInput.value = mmSsVal;
-      validateRangeInputs();
-      updateWheelBadges();
-      updateWheelStepButtons();
+    if (!isProgrammaticWheelScroll) {
+      const isStart = activeWheelTarget === 'start';
+      const targetInput = isStart ? elements.inputRangeStart : elements.inputRangeEnd;
+      const mmSsVal = formatMmSs(sec);
+      if (targetInput && targetInput.value !== mmSsVal) {
+        targetInput.value = mmSsVal;
+        validateRangeInputs();
+        updateWheelBadges();
+        updateWheelStepButtons();
+      }
     }
+
     updateSelectedWheelItem(sec);
     updateWheel3DEffect();
   });
