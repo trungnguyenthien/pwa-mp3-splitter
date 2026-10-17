@@ -7,7 +7,7 @@
   <meta name="description" content="Split MP3 audio files fast, losslessly and 100% offline in your browser. Zero quality loss, no server upload, frame-accurate cutting.">
 
   <!-- PWA & Mobile Capabilities -->
-  <link rel="manifest" href="./manifest.webmanifest?v=44">
+  <link rel="manifest" href="./manifest.webmanifest?v=45">
   <meta name="theme-color" content="#141518">
   <meta name="mobile-web-app-capable" content="yes">
   
@@ -15,14 +15,14 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="MP3 Splitter">
-  <link rel="apple-touch-icon" href="./icons/icon-192.png?v=44">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png?v=45">
 
   <!-- Favicons -->
-  <link rel="icon" type="image/svg+xml" href="./icons/favicon.svg?v=44">
-  <link rel="icon" type="image/png" href="./icons/favicon.png?v=44">
+  <link rel="icon" type="image/svg+xml" href="./icons/favicon.svg?v=45">
+  <link rel="icon" type="image/png" href="./icons/favicon.png?v=45">
 
   <!-- Versioned Stylesheet adhering to pwa-standards.md -->
-  <link rel="stylesheet" href="./styles.css?v=44">
+  <link rel="stylesheet" href="./styles.css?v=45">
 </head>
 <body>
 
@@ -395,6 +395,43 @@
           <span id="rangeDurationText" class="duration-val tabular-nums">01:00</span>
         </div>
 
+        <!-- Audio Range Preview Player (Play/Stop/Seek) -->
+        <div class="range-player-card" id="rangePlayerCard">
+          <div class="range-player-main">
+            <!-- Play / Pause Button -->
+            <button type="button" id="btnRangePlayPause" class="btn-range-play" title="Play preview" aria-label="Play preview audio">
+              <svg id="rangePlayIcon" class="range-icon-play" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <polygon points="6 4 20 12 6 20 6 4"/>
+              </svg>
+              <svg id="rangePauseIcon" class="range-icon-pause hidden" width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="6" y="4" width="4" height="16" rx="1.5"/>
+                <rect x="14" y="4" width="4" height="16" rx="1.5"/>
+              </svg>
+            </button>
+
+            <!-- Stop Button -->
+            <button type="button" id="btnRangeStop" class="btn-range-stop" title="Stop preview" aria-label="Stop preview audio">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                <rect x="5" y="5" width="14" height="14" rx="2"/>
+              </svg>
+            </button>
+
+            <!-- Seek Slider Section -->
+            <div class="range-seek-container">
+              <div class="range-seek-header">
+                <span class="range-seek-title">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>
+                  Preview Range
+                </span>
+                <span id="rangePreviewTime" class="range-preview-time tabular-nums">00:00 / 01:00</span>
+              </div>
+              <div class="range-slider-wrapper">
+                <input type="range" id="rangeSeekBar" class="range-seek-slider" min="0" max="60" step="0.05" value="0" aria-label="Seek preview audio">
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- Interactive 5-Column Wheeler Section -->
         <div id="timeWheelContainer" class="time-wheel-container">
           <div class="time-wheel-header">
@@ -745,6 +782,7 @@
 
   <!-- Shared Preview Audio Element -->
   <audio id="previewAudio" preload="auto" class="hidden"></audio>
+  <audio id="rangePreviewAudio" preload="auto" class="hidden"></audio>
 
   <!-- Global Snackbar / Toast (Error & Alert Notifications Only) -->
   <div id="snackbar" class="snackbar-container" role="status" aria-live="polite">
@@ -760,6 +798,6 @@
   </div>
 
   <!-- Application Logic with Cache-Busting adhering to pwa-standards.md -->
-  <script defer src="./app.js?v=44"></script>
+  <script defer src="./app.js?v=45"></script>
 </body>
 </html>

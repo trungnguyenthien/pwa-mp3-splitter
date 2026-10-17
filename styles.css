@@ -1632,17 +1632,215 @@ body.is-touch-device .dropzone-hint {
   }
 }
 
-.range-dialog-panel {
-  max-width: 440px;
+/* =============================================================================
+   Add Time Range Modal - Near Full Screen (50dp from Top)
+   ============================================================================= */
+#rangeDialog {
+  align-items: flex-end;
+  padding: 0;
+}
+
+#rangeDialog .range-dialog-panel {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  height: calc(100dvh - 50px);
+  max-height: calc(100dvh - 50px);
+  margin-top: 50px;
+  display: flex;
+  flex-direction: column;
+  border-top-left-radius: 24px;
+  border-top-right-radius: 24px;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  box-shadow: 0 -12px 48px rgba(0, 0, 0, 0.75);
+  padding-bottom: var(--safe-bottom, 0);
 }
 
 .range-dialog-body {
-  padding: 16px 20px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px 18px;
   gap: 12px;
+  display: flex;
+  flex-direction: column;
 }
 
 .range-dialog-body > * {
   flex-shrink: 0;
+}
+
+/* =============================================================================
+   Range Audio Preview Player (Dark Studio Style)
+   ============================================================================= */
+.range-player-card {
+  width: 100%;
+  background: linear-gradient(135deg, #131620 0%, #0b0d13 100%);
+  border: 1.5px solid #232736;
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05), 0 4px 16px rgba(0, 0, 0, 0.35);
+  box-sizing: border-box;
+}
+
+.range-player-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+}
+
+.btn-range-play {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #00f576 0%, #00c853 100%);
+  border: none;
+  color: #050608;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  box-shadow: 0 0 14px rgba(0, 245, 118, 0.45), inset 0 1px 1px rgba(255, 255, 255, 0.4);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+
+.btn-range-play:hover {
+  transform: scale(1.06);
+  box-shadow: 0 0 20px rgba(0, 245, 118, 0.65);
+}
+
+.btn-range-play:active {
+  transform: scale(0.93);
+}
+
+.btn-range-play:disabled,
+.btn-range-stop:disabled {
+  opacity: 0.28;
+  pointer-events: none;
+  filter: grayscale(1);
+}
+
+.btn-range-stop {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: #161822;
+  border: 1px solid #282c3c;
+  color: #9ca3af;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.btn-range-stop:hover {
+  background: #212534;
+  color: #ffffff;
+  border-color: #4b5563;
+  transform: scale(1.05);
+}
+
+.btn-range-stop:active {
+  transform: scale(0.93);
+}
+
+.range-seek-container {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+}
+
+.range-seek-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.range-seek-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: #9ca3af;
+  text-transform: uppercase;
+}
+
+.range-seek-title svg {
+  color: var(--md-sys-color-primary);
+}
+
+.range-preview-time {
+  font-size: 0.8rem;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #e5e7eb;
+}
+
+.range-slider-wrapper {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+}
+
+.range-seek-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(to right, #00e676 var(--progress, 0%), #212533 var(--progress, 0%));
+  outline: none;
+  margin: 3px 0;
+  cursor: pointer;
+  transition: background 0.04s ease;
+}
+
+.range-seek-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2.5px solid #00e676;
+  box-shadow: 0 0 10px rgba(0, 230, 118, 0.75);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.range-seek-slider:hover::-webkit-slider-thumb {
+  transform: scale(1.15);
+  box-shadow: 0 0 14px rgba(0, 230, 118, 0.95);
+}
+
+.range-seek-slider:active::-webkit-slider-thumb {
+  transform: scale(1.25);
+}
+
+.range-seek-slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2.5px solid #00e676;
+  box-shadow: 0 0 10px rgba(0, 230, 118, 0.75);
+  cursor: pointer;
+}
+
+.range-seek-slider:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
 }
 
 /* Form inputs & Range Sliders */

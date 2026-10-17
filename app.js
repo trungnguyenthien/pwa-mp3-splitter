@@ -37,6 +37,7 @@ const state = {
     dialog: null, // 'auto' | 'range' | 'ios' | null
     previewId: null, // part id, suggestion id, or 'whole'
     previewBlobUrl: null,
+    wholeFileBlobUrl: null,
     currentTime: 0,
     isWholePlaying: false,
   },
@@ -218,6 +219,16 @@ function initElements() {
     btnWheelStepPlus30: document.getElementById('btnWheelStepPlus30'),
     btnWheelStepPlus60: document.getElementById('btnWheelStepPlus60'),
 
+    // Range Audio Preview Player
+    rangePreviewAudio: document.getElementById('rangePreviewAudio'),
+    rangePlayerCard: document.getElementById('rangePlayerCard'),
+    btnRangePlayPause: document.getElementById('btnRangePlayPause'),
+    rangePlayIcon: document.getElementById('rangePlayIcon'),
+    rangePauseIcon: document.getElementById('rangePauseIcon'),
+    btnRangeStop: document.getElementById('btnRangeStop'),
+    rangeSeekBar: document.getElementById('rangeSeekBar'),
+    rangePreviewTime: document.getElementById('rangePreviewTime'),
+
     // iOS Install Modal
     iosInstallModal: document.getElementById('iosInstallModal'),
     btnCloseIosModal: document.getElementById('btnCloseIosModal'),
@@ -244,7 +255,7 @@ function initElements() {
 function initWorker() {
   try {
     if (window.Worker && window.location.protocol !== 'file:') {
-      mp3Worker = new Worker('./mp3-worker.js?v=44');
+      mp3Worker = new Worker('./mp3-worker.js?v=45');
       mp3Worker.onmessage = handleWorkerMessage;
       mp3Worker.onerror = (err) => {
         console.warn('Worker error, switching to in-thread processing:', err);
@@ -629,6 +640,39 @@ function initEvents() {
   if (elements.btnWheelStepPlus30) elements.btnWheelStepPlus30.addEventListener('click', () => stepWheel(30));
   if (elements.btnWheelStepPlus60) elements.btnWheelStepPlus60.addEventListener('click', () => stepWheel(60));
 
+  // Range Audio Preview Player controls
+  if (elements.btnRangePlayPause) {
+    elements.btnRangePlayPause.addEventListener('click', toggleRangeAudioPlay);
+  }
+  if (elements.btnRangeStop) {
+    elements.btnRangeStop.addEventListener('click', stopRangeAudioPreview);
+  }
+  if (elements.rangeSeekBar) {
+    const handleRangeSeek = () => {
+      const offset = parseFloat(elements.rangeSeekBar.value) || 0;
+      rangePlayer.currentOffset = offset;
+      if (elements.rangePreviewAudio) {
+        try {
+          elements.rangePreviewAudio.currentTime = rangePlayer.startSec + offset;
+        } catch (_) {}
+      }
+      const segDuration = Math.max(0, rangePlayer.endSec - rangePlayer.startSec);
+      const pct = segDuration > 0 ? (offset / segDuration) * 100 : 0;
+      elements.rangeSeekBar.style.setProperty('--progress', `${pct}%`);
+      if (elements.rangePreviewTime) {
+        elements.rangePreviewTime.textContent = `${formatMmSs(offset)} / ${formatMmSs(segDuration)}`;
+      }
+    };
+    elements.rangeSeekBar.addEventListener('input', handleRangeSeek);
+    elements.rangeSeekBar.addEventListener('change', handleRangeSeek);
+  }
+  if (elements.rangePreviewAudio) {
+    elements.rangePreviewAudio.addEventListener('ended', stopRangeAudioPreview);
+    elements.rangePreviewAudio.addEventListener('pause', () => {
+      if (rangePlayer.isPlaying) pauseRangeAudioPreview();
+    });
+  }
+
   if (elements.timeWheelViewport) {
     elements.timeWheelViewport.addEventListener('scroll', onWheelViewportScroll, { passive: true });
 
@@ -845,7 +889,11 @@ async function processSelectedFile(file) {
   state.suggestions = [];
   state.ui.currentTime = 0;
 
-  // Reset metadata
+  // Reset metadata & blob URLs
+  if (state.ui.wholeFileBlobUrl) {
+    try { URL.revokeObjectURL(state.ui.wholeFileBlobUrl); } catch (_) {}
+    state.ui.wholeFileBlobUrl = null;
+  }
   if (state.metadata && state.metadata.coverDataUrl) {
     try { URL.revokeObjectURL(state.metadata.coverDataUrl); } catch (_) {}
   }
@@ -2681,13 +2729,189 @@ function onWheelViewportScroll() {
 }
 
 // =============================================================================
-// Time Range Dialog Logic
+// Time Range Dialog & Audio Preview Controller
 // =============================================================================
+const rangePlayer = {
+  isPlaying: false,
+  startSec: 0,
+  endSec: 60,
+  currentOffset: 0,
+  rafId: null,
+};
+
+function getWholeFileBlobUrl() {
+  if (!state.file || !state.file.buffer) return null;
+  if (!state.ui.wholeFileBlobUrl) {
+    const mimeType = state.index && state.index.format === 'm4a' ? 'audio/mp4' : 'audio/mpeg';
+    state.ui.wholeFileBlobUrl = URL.createObjectURL(new Blob([state.file.buffer], { type: mimeType }));
+  }
+  return state.ui.wholeFileBlobUrl;
+}
+
+function initRangeAudioPreview() {
+  const url = getWholeFileBlobUrl();
+  if (elements.rangePreviewAudio && url) {
+    if (elements.rangePreviewAudio.src !== url) {
+      elements.rangePreviewAudio.src = url;
+    }
+  }
+}
+
+function updateRangeAudioPreviewBounds(startSec, endSec) {
+  rangePlayer.startSec = startSec;
+  rangePlayer.endSec = endSec;
+
+  const isValid = !isNaN(startSec) && !isNaN(endSec) && endSec > startSec;
+  const segDuration = isValid ? (endSec - startSec) : 0;
+
+  if (elements.btnRangePlayPause) elements.btnRangePlayPause.disabled = !isValid;
+  if (elements.btnRangeStop) elements.btnRangeStop.disabled = !isValid;
+  if (elements.rangeSeekBar) {
+    elements.rangeSeekBar.disabled = !isValid;
+    elements.rangeSeekBar.max = isValid ? segDuration : 0;
+  }
+
+  if (!isValid) {
+    if (rangePlayer.isPlaying) stopRangeAudioPreview();
+    if (elements.rangePreviewTime) elements.rangePreviewTime.textContent = '--:-- / --:--';
+    return;
+  }
+
+  if (rangePlayer.isPlaying) {
+    if (elements.rangePreviewAudio) {
+      const curTime = elements.rangePreviewAudio.currentTime;
+      if (curTime < startSec || curTime >= endSec) {
+        elements.rangePreviewAudio.currentTime = startSec;
+        rangePlayer.currentOffset = 0;
+      } else {
+        rangePlayer.currentOffset = curTime - startSec;
+      }
+    }
+  } else {
+    rangePlayer.currentOffset = 0;
+    if (elements.rangePreviewAudio) {
+      try {
+        elements.rangePreviewAudio.currentTime = startSec;
+      } catch (_) {}
+    }
+    if (elements.rangeSeekBar) {
+      elements.rangeSeekBar.value = 0;
+      elements.rangeSeekBar.style.setProperty('--progress', '0%');
+    }
+    if (elements.rangePreviewTime) {
+      elements.rangePreviewTime.textContent = `00:00 / ${formatMmSs(segDuration)}`;
+    }
+  }
+}
+
+function playRangeAudioPreview() {
+  if (!state.file || !state.file.buffer || !elements.rangePreviewAudio) return;
+  const segDuration = rangePlayer.endSec - rangePlayer.startSec;
+  if (segDuration <= 0) return;
+
+  // Stop background audio playback
+  stopPreview();
+
+  initRangeAudioPreview();
+
+  // If already at or past the end, restart from beginning of segment
+  if (rangePlayer.currentOffset >= segDuration - 0.05) {
+    rangePlayer.currentOffset = 0;
+  }
+
+  const targetTime = rangePlayer.startSec + rangePlayer.currentOffset;
+  try {
+    elements.rangePreviewAudio.currentTime = targetTime;
+  } catch (_) {}
+
+  elements.rangePreviewAudio.play()
+    .then(() => {
+      rangePlayer.isPlaying = true;
+      if (elements.rangePlayIcon) elements.rangePlayIcon.classList.add('hidden');
+      if (elements.rangePauseIcon) elements.rangePauseIcon.classList.remove('hidden');
+      tickRangeAudioPreview();
+    })
+    .catch((err) => {
+      console.warn('Range preview audio play error:', err);
+      stopRangeAudioPreview();
+    });
+}
+
+function pauseRangeAudioPreview() {
+  if (elements.rangePreviewAudio && !elements.rangePreviewAudio.paused) {
+    elements.rangePreviewAudio.pause();
+  }
+  rangePlayer.isPlaying = false;
+  if (rangePlayer.rafId) {
+    cancelAnimationFrame(rangePlayer.rafId);
+    rangePlayer.rafId = null;
+  }
+  if (elements.rangePlayIcon) elements.rangePlayIcon.classList.remove('hidden');
+  if (elements.rangePauseIcon) elements.rangePauseIcon.classList.add('hidden');
+}
+
+function stopRangeAudioPreview() {
+  pauseRangeAudioPreview();
+  rangePlayer.currentOffset = 0;
+  if (elements.rangePreviewAudio) {
+    try {
+      elements.rangePreviewAudio.currentTime = rangePlayer.startSec;
+    } catch (_) {}
+  }
+  const segDuration = Math.max(0, rangePlayer.endSec - rangePlayer.startSec);
+  if (elements.rangeSeekBar) {
+    elements.rangeSeekBar.value = 0;
+    elements.rangeSeekBar.style.setProperty('--progress', '0%');
+  }
+  if (elements.rangePreviewTime) {
+    elements.rangePreviewTime.textContent = `00:00 / ${formatMmSs(segDuration)}`;
+  }
+}
+
+function toggleRangeAudioPlay() {
+  if (rangePlayer.isPlaying) {
+    pauseRangeAudioPreview();
+  } else {
+    playRangeAudioPreview();
+  }
+}
+
+function tickRangeAudioPreview() {
+  if (!rangePlayer.isPlaying || !elements.rangePreviewAudio) return;
+
+  const curTime = elements.rangePreviewAudio.currentTime;
+  const segDuration = rangePlayer.endSec - rangePlayer.startSec;
+
+  if (curTime >= rangePlayer.endSec - 0.04 || elements.rangePreviewAudio.ended) {
+    stopRangeAudioPreview();
+    return;
+  }
+
+  const offset = Math.max(0, Math.min(segDuration, curTime - rangePlayer.startSec));
+  rangePlayer.currentOffset = offset;
+
+  if (elements.rangeSeekBar) {
+    elements.rangeSeekBar.value = offset;
+    const pct = segDuration > 0 ? (offset / segDuration) * 100 : 0;
+    elements.rangeSeekBar.style.setProperty('--progress', `${pct}%`);
+  }
+
+  if (elements.rangePreviewTime) {
+    elements.rangePreviewTime.textContent = `${formatMmSs(offset)} / ${formatMmSs(segDuration)}`;
+  }
+
+  rangePlayer.rafId = requestAnimationFrame(tickRangeAudioPreview);
+}
+
 function openRangeDialog() {
   if (!state.index) return;
 
   state.ui.dialog = 'range';
   elements.rangeDialog.classList.add('open');
+
+  // Stop any background playback and ready the range preview audio
+  stopPreview();
+  initRangeAudioPreview();
 
   elements.inputRangeStart.value = '00:00';
   elements.inputRangeEnd.value = formatMmSs(Math.min(60, state.index.duration));
@@ -2749,6 +2973,9 @@ function validateRangeInputs() {
   }
 
   updateWheelStepButtons();
+
+  // Update Range Preview Audio bounds and UI
+  updateRangeAudioPreviewBounds(startVal, endVal);
 }
 
 function addRangePart() {
@@ -3753,6 +3980,7 @@ function closeDialog() {
     elements.editTagsModal.style.pointerEvents = '';
   }
   closeTimeWheel();
+  stopRangeAudioPreview();
   state.ui.dialog = null;
   if (state.ui.previewId) {
     stopPreview();
