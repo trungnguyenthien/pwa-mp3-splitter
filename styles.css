@@ -1927,70 +1927,83 @@ input[type="range"]::-moz-range-thumb {
 /* =============================================================================
    WavePad DAW Jog Drum Time Wheel (Mobile-First, Always Visible)
    ============================================================================= */
+/* =============================================================================
+   TIME RANGE WHEEL CONTROLLER (3D Studio Cylinder & Tactile Hardware Pads)
+   ============================================================================= */
 .time-wheel-container {
-  background-color: #090a0d;
-  border: 1.5px solid var(--md-sys-color-outline-variant);
-  border-radius: var(--radius-md);
+  background: linear-gradient(180deg, #13161f 0%, #0a0c10 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
   overflow: hidden;
   margin: 0;
-  box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.8), 0 4px 12px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
 }
 
 .time-wheel-header {
-  background-color: #14161c;
-  padding: 6px 12px;
+  background: linear-gradient(180deg, #181b26 0%, #13151f 100%);
+  padding: 8px 14px;
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
-  border-bottom: 1px solid #1e2129;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   flex-shrink: 0;
 }
 
 .time-wheel-target-info {
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-size: 0.78rem;
+  gap: 8px;
 }
 
 .wheel-target-dot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background-color: var(--md-sys-color-primary);
-  box-shadow: 0 0 6px var(--md-sys-color-primary);
+  box-shadow: 0 0 8px var(--md-sys-color-primary);
 }
 
 .wheel-target-label {
-  color: var(--md-sys-color-on-surface-variant);
-  font-size: 0.74rem;
+  color: #94a3b8;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .wheel-target-name {
-  color: var(--md-sys-color-primary);
+  color: #00f576;
   font-weight: 700;
-  font-size: 0.82rem;
+  font-size: 0.84rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
-.time-wheel-header-hint {
+.wheel-limit-badge {
   font-size: 0.72rem;
-  color: var(--md-sys-color-on-surface-variant);
-  opacity: 0.7;
+  font-weight: 600;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #cbd5e1;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 2px 8px;
+  border-radius: 12px;
+  letter-spacing: 0.02em;
 }
 
-/* 5-Column Grid Layout: [-60s] [-30s] [ Wheeler ] [+30s] [+60s] */
+/* 5-Column Grid Layout: [-60s] [-30s] [ 3D Cylinder ] [+30s] [+60s] */
 .time-wheel-grid {
   display: flex;
   flex-direction: row;
   align-items: stretch;
-  height: 154px;
-  min-height: 154px;
-  background-color: #07080a;
+  height: 160px;
+  min-height: 160px;
+  background: #090a0f;
+  padding: 6px;
+  gap: 6px;
   position: relative;
   user-select: none;
   -webkit-user-select: none;
@@ -1999,59 +2012,84 @@ input[type="range"]::-moz-range-thumb {
 .btn-wheel-step-box {
   flex: 0 0 17%;
   min-width: 44px;
-  background-color: #12141a;
-  border: none;
+  background: linear-gradient(180deg, #1a1d28 0%, #11131a 100%);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 10px;
   color: #e2e8f0;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.88rem;
-  font-weight: 700;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 3px;
   cursor: pointer;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
-  transition: background-color 0.12s ease, color 0.12s ease, transform 0.08s ease;
-  border-right: 1px solid #232733;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: all 0.14s cubic-bezier(0.2, 0, 0, 1);
 }
 
-#btnWheelStepPlus30 {
-  border-left: 1px solid #232733;
-}
-
-.btn-wheel-step-box:last-child {
-  border-right: none;
-}
-
-.btn-wheel-step-box:hover {
-  background-color: #1a1e28;
-  color: var(--md-sys-color-primary);
-}
-
-.btn-wheel-step-box:active {
-  background-color: #10381e;
+.btn-wheel-step-box:hover:not(:disabled) {
+  background: linear-gradient(180deg, #242938 0%, #161924 100%);
+  border-color: rgba(0, 230, 118, 0.45);
   color: #00f576;
-  transform: scale(0.96);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), 0 0 10px rgba(0, 230, 118, 0.2);
 }
 
-.btn-wheel-step-box .step-box-val {
+.btn-wheel-step-box:active:not(:disabled) {
+  background: #0f2e1a;
+  border-color: #00f576;
+  color: #00f576;
+  transform: scale(0.95);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6), 0 0 14px rgba(0, 230, 118, 0.4);
+}
+
+.btn-wheel-step-box:disabled,
+.btn-wheel-step-box.is-disabled {
+  opacity: 0.2 !important;
+  cursor: not-allowed !important;
+  pointer-events: none !important;
+  filter: grayscale(1);
+  box-shadow: none;
+}
+
+.step-box-val {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.96rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
   pointer-events: none;
-  letter-spacing: -0.02em;
 }
 
+.step-box-sub {
+  font-size: 0.64rem;
+  font-weight: 600;
+  color: #64748b;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+
+.btn-wheel-step-box:hover:not(:disabled) .step-box-sub {
+  color: #94a3b8;
+}
+
+/* Center Column with 3D Perspective Drum */
 .time-wheel-col {
   flex: 1 1 32%;
   position: relative;
   height: 100%;
   overflow: hidden;
-  background-color: #07080a;
+  background: radial-gradient(ellipse at center, #10131d 0%, #050608 100%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.85);
+  perspective: 700px;
 }
 
 .time-wheel-viewport {
   width: 100%;
   height: 100%;
   position: relative;
-  background-color: #07080a;
   overflow-y: scroll;
   overflow-x: hidden !important;
   scroll-snap-type: y mandatory;
@@ -2075,40 +2113,44 @@ input[type="range"]::-moz-range-thumb {
   cursor: grabbing;
 }
 
+/* Glassmorphism Aperture Lens */
 .time-wheel-lens {
   position: absolute;
   top: 50%;
-  left: 3px;
-  right: 3px;
-  height: 36px;
+  left: 4px;
+  right: 4px;
+  height: 38px;
   transform: translateY(-50%);
-  border-top: 1.5px solid var(--md-sys-color-primary);
-  border-bottom: 1.5px solid var(--md-sys-color-primary);
-  background: linear-gradient(90deg, rgba(0, 230, 118, 0.05), rgba(0, 230, 118, 0.14), rgba(0, 230, 118, 0.05));
-  box-shadow: 0 0 12px rgba(0, 230, 118, 0.25);
-  border-radius: 4px;
+  border-top: 1.5px solid rgba(0, 230, 118, 0.65);
+  border-bottom: 1.5px solid rgba(0, 230, 118, 0.65);
+  background: linear-gradient(90deg, rgba(0, 230, 118, 0.04) 0%, rgba(0, 230, 118, 0.14) 50%, rgba(0, 230, 118, 0.04) 100%);
+  box-shadow: 0 0 16px rgba(0, 230, 118, 0.25), inset 0 0 12px rgba(0, 230, 118, 0.06);
+  border-radius: 6px;
   pointer-events: none;
   z-index: 4;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 6px;
+  padding: 0 5px;
 }
 
-.wheel-lens-arrow {
-  color: var(--md-sys-color-primary);
-  font-size: 0.65rem;
-  text-shadow: 0 0 6px var(--md-sys-color-primary);
-  opacity: 0.85;
+.wheel-lens-tick {
+  width: 3px;
+  height: 14px;
+  background-color: #00f576;
+  border-radius: 2px;
+  box-shadow: 0 0 8px #00f576;
+  opacity: 0.9;
 }
 
+/* Vignette Drum Horizon Shadows */
 .time-wheel-fade-top {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  height: 48px;
-  background: linear-gradient(180deg, #07080a 20%, rgba(7, 8, 10, 0.85) 60%, transparent 100%);
+  height: 52px;
+  background: linear-gradient(180deg, #050608 15%, rgba(5, 6, 8, 0.85) 55%, transparent 100%);
   pointer-events: none;
   z-index: 3;
 }
@@ -2118,8 +2160,8 @@ input[type="range"]::-moz-range-thumb {
   bottom: 0;
   left: 0;
   right: 0;
-  height: 48px;
-  background: linear-gradient(0deg, #07080a 20%, rgba(7, 8, 10, 0.85) 60%, transparent 100%);
+  height: 52px;
+  background: linear-gradient(0deg, #050608 15%, rgba(5, 6, 8, 0.85) 55%, transparent 100%);
   pointer-events: none;
   z-index: 3;
 }
@@ -2128,12 +2170,13 @@ input[type="range"]::-moz-range-thumb {
   width: 100%;
   box-sizing: border-box;
   overflow: hidden;
-  padding-top: 59px;
-  padding-bottom: 59px;
+  padding-top: 55px;
+  padding-bottom: 55px;
+  transform-style: preserve-3d;
 }
 
 .wheel-item {
-  height: 36px;
+  height: 38px;
   width: 100%;
   box-sizing: border-box;
   overflow: hidden;
@@ -2145,53 +2188,32 @@ input[type="range"]::-moz-range-thumb {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.95rem;
   font-weight: 500;
-  color: #727888;
-  opacity: 0.45;
-  transition: opacity 0.12s ease, color 0.12s ease;
+  color: #64748b;
+  opacity: 0.35;
   cursor: pointer;
-  content-visibility: auto;
-  contain-intrinsic-size: 36px;
+  transform-origin: center center;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+  transition: color 0.12s ease;
 }
 
-.wheel-item:hover,
-.wheel-item:active {
-  opacity: 0.85;
-  color: #eceff1;
+.wheel-item:hover {
+  color: #e2e8f0;
 }
 
 .wheel-item.is-selected {
-  color: var(--md-sys-color-primary);
-  font-size: 1.25rem;
+  color: #00f576;
+  font-size: 1.3rem;
   font-weight: 800;
   opacity: 1;
-  text-shadow: 0 0 12px rgba(0, 230, 118, 0.7);
-}
-
-.wheel-item.is-disabled {
-  opacity: 0.12 !important;
-  color: #334155 !important;
-  cursor: not-allowed;
-  pointer-events: none;
+  text-shadow: 0 0 16px rgba(0, 245, 118, 0.7);
+  letter-spacing: 0.03em;
 }
 
 .wheel-time-fmt {
   opacity: 1;
   font-size: 1em;
   letter-spacing: 0.02em;
-}
-
-.time-wheel-footer {
-  background-color: #101217;
-  padding: 5px 10px;
-  border-top: 1px solid #1a1c23;
-  text-align: center;
-  flex-shrink: 0;
-}
-
-.time-wheel-hint {
-  font-size: 0.7rem;
-  color: var(--md-sys-color-on-surface-variant);
-  opacity: 0.85;
 }
 
 .quick-chips-row {

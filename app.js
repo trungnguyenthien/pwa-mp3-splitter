@@ -212,6 +212,7 @@ function initElements() {
     chipEndAtTotal: document.getElementById('chipEndAtTotal'),
     timeWheelContainer: document.getElementById('timeWheelContainer'),
     wheelTargetText: document.getElementById('wheelTargetText'),
+    wheelLimitBadge: document.getElementById('wheelLimitBadge'),
     timeWheelViewport: document.getElementById('timeWheelViewport'),
     timeWheelTrack: document.getElementById('timeWheelTrack'),
     btnWheelStepMinus60: document.getElementById('btnWheelStepMinus60'),
@@ -245,7 +246,7 @@ function initElements() {
 function initWorker() {
   try {
     if (window.Worker && window.location.protocol !== 'file:') {
-      mp3Worker = new Worker('./mp3-worker.js?v=40');
+      mp3Worker = new Worker('./mp3-worker.js?v=41');
       mp3Worker.onmessage = handleWorkerMessage;
       mp3Worker.onerror = (err) => {
         console.warn('Worker error, switching to in-thread processing:', err);
@@ -2500,70 +2501,116 @@ function parseTimeToSeconds(val) {
   return isNaN(num) ? NaN : num;
 }
 
-const WHEEL_ITEM_HEIGHT = 36;
+const WHEEL_ITEM_HEIGHT = 38;
 let activeWheelTarget = 'start'; // 'start' | 'end'
-let wheelMaxSec = 300;
-let builtWheelDuration = -1;
+let wheelMinSec = 0;
+let wheelMaxSec = 60;
 let isProgrammaticWheelScroll = false;
 let wheelScrollRaf = null;
 let scrollResetTimeout = null;
 let lastSelectedSec = -1;
 
-function updateWheelDisabledItems() {
+function updateWheelStepButtons() {
+  const isStart = activeWheelTarget === 'start';
+  const targetInput = isStart ? elements.inputRangeStart : elements.inputRangeEnd;
+  const currentSec = parseTimeToSeconds(targetInput ? targetInput.value : '0') || 0;
+
+  const atMin = currentSec <= wheelMinSec;
+  if (elements.btnWheelStepMinus60) {
+    elements.btnWheelStepMinus60.disabled = atMin;
+    elements.btnWheelStepMinus60.classList.toggle('is-disabled', atMin);
+  }
+  if (elements.btnWheelStepMinus30) {
+    elements.btnWheelStepMinus30.disabled = atMin;
+    elements.btnWheelStepMinus30.classList.toggle('is-disabled', atMin);
+  }
+
+  const atMax = currentSec >= wheelMaxSec;
+  if (elements.btnWheelStepPlus30) {
+    elements.btnWheelStepPlus30.disabled = atMax;
+    elements.btnWheelStepPlus30.classList.toggle('is-disabled', atMax);
+  }
+  if (elements.btnWheelStepPlus60) {
+    elements.btnWheelStepPlus60.disabled = atMax;
+    elements.btnWheelStepPlus60.classList.toggle('is-disabled', atMax);
+  }
+}
+
+function updateWheel3DEffect() {
+  if (!elements.timeWheelViewport || !elements.timeWheelTrack) return;
+  const scrollTop = elements.timeWheelViewport.scrollTop;
+  const centerIndex = scrollTop / WHEEL_ITEM_HEIGHT;
+  const items = elements.timeWheelTrack.children;
+  const total = items.length;
+  if (total === 0) return;
+
+  const minVisible = Math.max(0, Math.floor(centerIndex - 4));
+  const maxVisible = Math.min(total - 1, Math.ceil(centerIndex + 4));
+
+  for (let i = 0; i < total; i++) {
+    const item = items[i];
+    if (i < minVisible || i > maxVisible) {
+      item.style.transform = '';
+      item.style.opacity = '0';
+      continue;
+    }
+    const dist = i - centerIndex;
+    const absDist = Math.abs(dist);
+    const rotateX = dist * -24;
+    const scale = Math.max(0.68, 1 - absDist * 0.10);
+    const opacity = Math.max(0.12, 1 - absDist * 0.32);
+    const translateZ = Math.cos(dist * 0.45) * 16 - 16;
+
+    item.style.transform = `rotateX(${rotateX}deg) translateZ(${translateZ}px) scale(${scale})`;
+    item.style.opacity = String(opacity);
+  }
+}
+
+function buildTimeWheelTrack() {
   if (!elements.timeWheelTrack) return;
   const isStart = activeWheelTarget === 'start';
   const startSec = parseTimeToSeconds(elements.inputRangeStart ? elements.inputRangeStart.value : '0') || 0;
   const endSec = parseTimeToSeconds(elements.inputRangeEnd ? elements.inputRangeEnd.value : '0') || 0;
+  const duration = Math.ceil(state.index ? state.index.duration : 300);
 
-  const items = elements.timeWheelTrack.children;
-  for (let i = 0; i < items.length; i++) {
-    const s = i;
-    if (isStart) {
-      items[i].classList.toggle('is-disabled', s > endSec);
-    } else {
-      items[i].classList.toggle('is-disabled', s < startSec);
-    }
+  if (isStart) {
+    wheelMinSec = 0;
+    wheelMaxSec = Math.max(0, endSec);
+  } else {
+    wheelMinSec = Math.max(0, startSec);
+    wheelMaxSec = Math.max(wheelMinSec, duration);
   }
-}
 
-function buildTimeWheelTrack(duration) {
-  if (!elements.timeWheelTrack) return;
-  const maxSec = Math.max(10, Math.ceil(duration || 300));
-  if (builtWheelDuration === maxSec && elements.timeWheelTrack.childElementCount > 0) {
-    wheelMaxSec = maxSec;
-    updateWheelDisabledItems();
-    return;
-  }
-  wheelMaxSec = maxSec;
-  builtWheelDuration = maxSec;
-
+  const count = Math.max(1, wheelMaxSec - wheelMinSec + 1);
   const frag = document.createDocumentFragment();
-  for (let s = 0; s <= maxSec; s++) {
+
+  for (let i = 0; i < count; i++) {
+    const s = wheelMinSec + i;
     const item = document.createElement('div');
     item.className = 'wheel-item';
     item.dataset.sec = String(s);
+    item.dataset.index = String(i);
     item.innerHTML = `<span class="wheel-time-fmt">${formatMmSs(s)}</span>`;
     frag.appendChild(item);
   }
+
   elements.timeWheelTrack.innerHTML = '';
   elements.timeWheelTrack.appendChild(frag);
-  updateWheelDisabledItems();
+
+  lastSelectedSec = -1;
+  updateWheelBadges();
+  updateWheelStepButtons();
+  updateWheel3DEffect();
 }
 
 function openTimeWheel(targetField = 'start') {
   if (!elements.timeWheelContainer) return;
   activeWheelTarget = targetField;
 
-  if (state.index && state.index.duration) {
-    buildTimeWheelTrack(state.index.duration);
-  } else {
-    updateWheelDisabledItems();
-  }
-
   if (elements.cardRangeStart) elements.cardRangeStart.classList.toggle('active', targetField === 'start');
   if (elements.cardRangeEnd) elements.cardRangeEnd.classList.toggle('active', targetField === 'end');
 
-  updateWheelBadges();
+  buildTimeWheelTrack();
 
   const targetInput = targetField === 'start' ? elements.inputRangeStart : elements.inputRangeEnd;
   const currentVal = targetInput ? Math.round(parseTimeToSeconds(targetInput.value) || 0) : 0;
@@ -2579,15 +2626,18 @@ function closeTimeWheel() {
 
 function scrollToWheelSec(sec, behavior = 'auto') {
   if (!elements.timeWheelViewport) return;
-  const clampedSec = Math.max(0, Math.min(wheelMaxSec, Math.round(sec)));
+  const clampedSec = Math.max(wheelMinSec, Math.min(wheelMaxSec, Math.round(sec)));
+  const index = clampedSec - wheelMinSec;
   isProgrammaticWheelScroll = true;
 
   elements.timeWheelViewport.scrollTo({
-    top: clampedSec * WHEEL_ITEM_HEIGHT,
+    top: index * WHEEL_ITEM_HEIGHT,
     behavior,
   });
 
   updateSelectedWheelItem(clampedSec);
+  updateWheel3DEffect();
+  updateWheelStepButtons();
 
   if (scrollResetTimeout) clearTimeout(scrollResetTimeout);
   scrollResetTimeout = setTimeout(() => {
@@ -2613,6 +2663,11 @@ function updateWheelBadges() {
   if (elements.wheelTargetText) {
     elements.wheelTargetText.textContent = isStart ? `Start (${curVal})` : `End (${curVal})`;
   }
+  if (elements.wheelLimitBadge) {
+    elements.wheelLimitBadge.textContent = isStart
+      ? `Max: ${elements.inputRangeEnd ? elements.inputRangeEnd.value : '00:00'}`
+      : `Min: ${elements.inputRangeStart ? elements.inputRangeStart.value : '00:00'}`;
+  }
 }
 
 function stepWheel(delta) {
@@ -2621,18 +2676,8 @@ function stepWheel(delta) {
   if (!targetInput) return;
 
   const current = parseTimeToSeconds(targetInput.value) || 0;
-  const startSec = parseTimeToSeconds(elements.inputRangeStart ? elements.inputRangeStart.value : '0') || 0;
-  const endSec = parseTimeToSeconds(elements.inputRangeEnd ? elements.inputRangeEnd.value : '0') || 0;
-
   let next = current + delta;
-
-  if (isStart) {
-    // Start cannot exceed End (start <= end)
-    next = Math.max(0, Math.min(endSec, Math.round(next)));
-  } else {
-    // End cannot be less than Start (end >= start)
-    next = Math.max(startSec, Math.min(wheelMaxSec, Math.round(next)));
-  }
+  next = Math.max(wheelMinSec, Math.min(wheelMaxSec, Math.round(next)));
 
   targetInput.value = formatMmSs(next);
   validateRangeInputs();
@@ -2646,40 +2691,22 @@ function onWheelViewportScroll() {
   if (wheelScrollRaf) cancelAnimationFrame(wheelScrollRaf);
   wheelScrollRaf = requestAnimationFrame(() => {
     const scrollTop = elements.timeWheelViewport.scrollTop;
-    let sec = Math.max(0, Math.min(wheelMaxSec, Math.round(scrollTop / WHEEL_ITEM_HEIGHT)));
+    const index = Math.round(scrollTop / WHEEL_ITEM_HEIGHT);
+    const count = elements.timeWheelTrack ? elements.timeWheelTrack.childElementCount : 0;
+    const clampedIndex = Math.max(0, Math.min(Math.max(0, count - 1), index));
+    const sec = wheelMinSec + clampedIndex;
 
     const isStart = activeWheelTarget === 'start';
-    const startSec = parseTimeToSeconds(elements.inputRangeStart ? elements.inputRangeStart.value : '0') || 0;
-    const endSec = parseTimeToSeconds(elements.inputRangeEnd ? elements.inputRangeEnd.value : '0') || 0;
-
-    let clamped = false;
-    if (isStart) {
-      if (sec > endSec) {
-        sec = endSec;
-        clamped = true;
-      }
-    } else {
-      if (sec < startSec) {
-        sec = startSec;
-        clamped = true;
-      }
-    }
-
     const targetInput = isStart ? elements.inputRangeStart : elements.inputRangeEnd;
     const mmSsVal = formatMmSs(sec);
     if (targetInput && targetInput.value !== mmSsVal) {
       targetInput.value = mmSsVal;
       validateRangeInputs();
       updateWheelBadges();
+      updateWheelStepButtons();
     }
     updateSelectedWheelItem(sec);
-
-    if (clamped) {
-      if (scrollResetTimeout) clearTimeout(scrollResetTimeout);
-      scrollResetTimeout = setTimeout(() => {
-        scrollToWheelSec(sec, 'smooth');
-      }, 90);
-    }
+    updateWheel3DEffect();
   });
 }
 
@@ -2697,7 +2724,6 @@ function openRangeDialog() {
   validateRangeInputs();
 
   // Initialize and open time wheel on Start Time
-  buildTimeWheelTrack(state.index.duration);
   openTimeWheel('start');
 }
 
@@ -2760,7 +2786,7 @@ function validateRangeInputs() {
     elements.btnAddPartRange.disabled = false;
   }
 
-  updateWheelDisabledItems();
+  updateWheelStepButtons();
 }
 
 function addRangePart() {

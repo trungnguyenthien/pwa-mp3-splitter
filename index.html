@@ -7,7 +7,7 @@
   <meta name="description" content="Split MP3 audio files fast, losslessly and 100% offline in your browser. Zero quality loss, no server upload, frame-accurate cutting.">
 
   <!-- PWA & Mobile Capabilities -->
-  <link rel="manifest" href="./manifest.webmanifest?v=40">
+  <link rel="manifest" href="./manifest.webmanifest?v=41">
   <meta name="theme-color" content="#141518">
   <meta name="mobile-web-app-capable" content="yes">
   
@@ -15,14 +15,14 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="MP3 Splitter">
-  <link rel="apple-touch-icon" href="./icons/icon-192.png?v=40">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png?v=41">
 
   <!-- Favicons -->
-  <link rel="icon" type="image/svg+xml" href="./icons/favicon.svg?v=40">
-  <link rel="icon" type="image/png" href="./icons/favicon.png?v=40">
+  <link rel="icon" type="image/svg+xml" href="./icons/favicon.svg?v=41">
+  <link rel="icon" type="image/png" href="./icons/favicon.png?v=41">
 
   <!-- Versioned Stylesheet adhering to pwa-standards.md -->
-  <link rel="stylesheet" href="./styles.css?v=40">
+  <link rel="stylesheet" href="./styles.css?v=41">
 </head>
 <body>
 
@@ -399,7 +399,7 @@
           <span id="rangeDurationText" class="duration-val tabular-nums">01:00</span>
         </div>
 
-        <!-- Interactive 5-Column Wheeler Section (Matching User Diagram) -->
+        <!-- Interactive 5-Column Wheeler Section -->
         <div id="timeWheelContainer" class="time-wheel-container">
           <div class="time-wheel-header">
             <div class="time-wheel-target-info">
@@ -407,23 +407,26 @@
               <span class="wheel-target-label">Adjust:</span>
               <span id="wheelTargetText" class="wheel-target-name">Start (00:00)</span>
             </div>
-            <span class="time-wheel-header-hint">Scroll or tap buttons</span>
+            <span id="wheelLimitBadge" class="wheel-limit-badge">Max: 01:00</span>
           </div>
 
           <div class="time-wheel-grid">
             <!-- Left Step Columns: -60s and -30s -->
-            <button type="button" id="btnWheelStepMinus60" class="btn-wheel-step-box tabular-nums" title="Subtract 60 seconds" aria-label="Subtract 60s">
-              <span class="step-box-val">-60s</span>
+            <button type="button" id="btnWheelStepMinus60" class="btn-wheel-step-box" title="Subtract 60 seconds" aria-label="Subtract 60s">
+              <span class="step-box-val">−60s</span>
+              <span class="step-box-sub">−1m</span>
             </button>
-            <button type="button" id="btnWheelStepMinus30" class="btn-wheel-step-box tabular-nums" title="Subtract 30 seconds" aria-label="Subtract 30s">
-              <span class="step-box-val">-30s</span>
+            <button type="button" id="btnWheelStepMinus30" class="btn-wheel-step-box" title="Subtract 30 seconds" aria-label="Subtract 30s">
+              <span class="step-box-val">−30s</span>
+              <span class="step-box-sub">−30s</span>
             </button>
 
-            <!-- Center Wheeler Column with Fixed Overlays -->
+            <!-- Center Wheeler Column with 3D Cylinder -->
             <div class="time-wheel-col">
               <div class="time-wheel-lens">
-                <span class="wheel-lens-arrow">▶</span>
-                <span class="wheel-lens-arrow">◀</span>
+                <span class="wheel-lens-tick wheel-lens-tick-left"></span>
+                <span class="wheel-lens-focus"></span>
+                <span class="wheel-lens-tick wheel-lens-tick-right"></span>
               </div>
               <div class="time-wheel-fade-top"></div>
               <div class="time-wheel-fade-bottom"></div>
@@ -433,11 +436,13 @@
             </div>
 
             <!-- Right Step Columns: +30s and +60s -->
-            <button type="button" id="btnWheelStepPlus30" class="btn-wheel-step-box tabular-nums" title="Add 30 seconds" aria-label="Add 30s">
+            <button type="button" id="btnWheelStepPlus30" class="btn-wheel-step-box" title="Add 30 seconds" aria-label="Add 30s">
               <span class="step-box-val">+30s</span>
+              <span class="step-box-sub">+30s</span>
             </button>
-            <button type="button" id="btnWheelStepPlus60" class="btn-wheel-step-box tabular-nums" title="Add 60 seconds" aria-label="Add 60s">
+            <button type="button" id="btnWheelStepPlus60" class="btn-wheel-step-box" title="Add 60 seconds" aria-label="Add 60s">
               <span class="step-box-val">+60s</span>
+              <span class="step-box-sub">+1m</span>
             </button>
           </div>
         </div>
@@ -763,6 +768,6 @@
   </div>
 
   <!-- Application Logic with Cache-Busting adhering to pwa-standards.md -->
-  <script defer src="./app.js?v=40"></script>
+  <script defer src="./app.js?v=41"></script>
 </body>
 </html>
