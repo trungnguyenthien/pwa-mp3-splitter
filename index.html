@@ -7,7 +7,7 @@
   <meta name="description" content="Split MP3 audio files fast, losslessly and 100% offline in your browser. Zero quality loss, no server upload, frame-accurate cutting.">
 
   <!-- PWA & Mobile Capabilities -->
-  <link rel="manifest" href="./manifest.webmanifest?v=36">
+  <link rel="manifest" href="./manifest.webmanifest?v=40">
   <meta name="theme-color" content="#141518">
   <meta name="mobile-web-app-capable" content="yes">
   
@@ -15,14 +15,14 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="MP3 Splitter">
-  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png?v=40">
 
   <!-- Favicons -->
-  <link rel="icon" type="image/svg+xml" href="./icons/favicon.svg">
-  <link rel="icon" type="image/png" href="./icons/favicon.png">
+  <link rel="icon" type="image/svg+xml" href="./icons/favicon.svg?v=40">
+  <link rel="icon" type="image/png" href="./icons/favicon.png?v=40">
 
   <!-- Versioned Stylesheet adhering to pwa-standards.md -->
-  <link rel="stylesheet" href="./styles.css?v=36">
+  <link rel="stylesheet" href="./styles.css?v=40">
 </head>
 <body>
 
@@ -376,7 +376,7 @@
             <div class="time-card-input-wrapper">
               <input type="text" id="inputRangeStart" class="time-card-input tabular-nums" placeholder="00:00" inputmode="numeric" autocomplete="off" spellcheck="false" value="00:00">
             </div>
-            <div id="rangeStartHelper" class="time-card-sub tabular-nums">00:00.0 (0s)</div>
+            <div id="rangeStartHelper" class="time-card-sub tabular-nums">00:00</div>
           </div>
 
           <div class="time-card" id="cardRangeEnd" role="button" tabindex="0" aria-label="Select end time">
@@ -388,7 +388,7 @@
             <div class="time-card-input-wrapper">
               <input type="text" id="inputRangeEnd" class="time-card-input tabular-nums" placeholder="01:00" inputmode="numeric" autocomplete="off" spellcheck="false" value="01:00">
             </div>
-            <div id="rangeEndHelper" class="time-card-sub tabular-nums">01:00.0 (60s)</div>
+            <div id="rangeEndHelper" class="time-card-sub tabular-nums">01:00</div>
           </div>
         </div>
 
@@ -396,10 +396,10 @@
         <div class="time-duration-pill" id="rangeDurationPill">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           <span class="duration-label">Range Duration:</span>
-          <span id="rangeDurationText" class="duration-val tabular-nums">01:00 (60s)</span>
+          <span id="rangeDurationText" class="duration-val tabular-nums">01:00</span>
         </div>
 
-        <!-- Interactive Jog Wheel Spinner Section (Always Visible on Mobile) -->
+        <!-- Interactive 5-Column Wheeler Section (Matching User Diagram) -->
         <div id="timeWheelContainer" class="time-wheel-container">
           <div class="time-wheel-header">
             <div class="time-wheel-target-info">
@@ -407,33 +407,44 @@
               <span class="wheel-target-label">Adjust:</span>
               <span id="wheelTargetText" class="wheel-target-name">Start (00:00)</span>
             </div>
-
-            <div class="time-wheel-actions">
-              <button type="button" id="btnWheelStepMinus10" class="btn-wheel-step tabular-nums" title="Back 10s">-10s</button>
-              <button type="button" id="btnWheelStepMinus1" class="btn-wheel-step tabular-nums" title="Back 1s">-1s</button>
-              <button type="button" id="btnWheelStepPlus1" class="btn-wheel-step tabular-nums" title="Forward 1s">+1s</button>
-              <button type="button" id="btnWheelStepPlus10" class="btn-wheel-step tabular-nums" title="Forward 10s">+10s</button>
-            </div>
+            <span class="time-wheel-header-hint">Scroll or tap buttons</span>
           </div>
 
-          <div class="time-wheel-viewport" id="timeWheelViewport" tabindex="0" role="slider" aria-label="Time Wheel Picker">
-            <div class="time-wheel-lens">
-              <span class="wheel-lens-arrow">▶</span>
-              <span class="wheel-lens-arrow">◀</span>
-            </div>
-            <div class="time-wheel-fade-top"></div>
-            <div class="time-wheel-fade-bottom"></div>
-            <div class="time-wheel-track" id="timeWheelTrack"></div>
-          </div>
+          <div class="time-wheel-grid">
+            <!-- Left Step Columns: -60s and -30s -->
+            <button type="button" id="btnWheelStepMinus60" class="btn-wheel-step-box tabular-nums" title="Subtract 60 seconds" aria-label="Subtract 60s">
+              <span class="step-box-val">-60s</span>
+            </button>
+            <button type="button" id="btnWheelStepMinus30" class="btn-wheel-step-box tabular-nums" title="Subtract 30 seconds" aria-label="Subtract 30s">
+              <span class="step-box-val">-30s</span>
+            </button>
 
-          <div class="time-wheel-footer">
-            <span class="time-wheel-hint">💡 Tap Start / End card • Drag wheel to adjust seconds</span>
+            <!-- Center Wheeler Column with Fixed Overlays -->
+            <div class="time-wheel-col">
+              <div class="time-wheel-lens">
+                <span class="wheel-lens-arrow">▶</span>
+                <span class="wheel-lens-arrow">◀</span>
+              </div>
+              <div class="time-wheel-fade-top"></div>
+              <div class="time-wheel-fade-bottom"></div>
+              <div class="time-wheel-viewport" id="timeWheelViewport" tabindex="0" role="slider" aria-label="Time Wheel Picker">
+                <div class="time-wheel-track" id="timeWheelTrack"></div>
+              </div>
+            </div>
+
+            <!-- Right Step Columns: +30s and +60s -->
+            <button type="button" id="btnWheelStepPlus30" class="btn-wheel-step-box tabular-nums" title="Add 30 seconds" aria-label="Add 30s">
+              <span class="step-box-val">+30s</span>
+            </button>
+            <button type="button" id="btnWheelStepPlus60" class="btn-wheel-step-box tabular-nums" title="Add 60 seconds" aria-label="Add 60s">
+              <span class="step-box-val">+60s</span>
+            </button>
           </div>
         </div>
 
         <!-- Quick chips -->
         <div class="quick-chips-row">
-          <button type="button" id="chipStartFromZero" class="btn btn-tonal btn-sm">From start (0s)</button>
+          <button type="button" id="chipStartFromZero" class="btn btn-tonal btn-sm">From start (00:00)</button>
           <button type="button" id="chipEndAtTotal" class="btn btn-tonal btn-sm">To end of track</button>
         </div>
 
@@ -752,6 +763,6 @@
   </div>
 
   <!-- Application Logic with Cache-Busting adhering to pwa-standards.md -->
-  <script defer src="./app.js?v=36"></script>
+  <script defer src="./app.js?v=40"></script>
 </body>
 </html>

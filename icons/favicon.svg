@@ -1,15 +1,57 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <rect width="64" height="64" rx="14" fill="#6750A4"/>
-  <rect x="12" y="24" width="4" height="16" rx="2" fill="#EADDFF"/>
-  <rect x="19" y="16" width="4" height="32" rx="2" fill="#EADDFF"/>
-  <rect x="26" y="20" width="4" height="24" rx="2" fill="#EADDFF"/>
-  <rect x="34" y="20" width="4" height="24" rx="2" fill="#EADDFF"/>
-  <rect x="41" y="16" width="4" height="32" rx="2" fill="#EADDFF"/>
-  <rect x="48" y="24" width="4" height="16" rx="2" fill="#EADDFF"/>
-  <line x1="32" y1="12" x2="32" y2="52" stroke="#FFD8E4" stroke-width="2" stroke-dasharray="3 2"/>
-  <circle cx="27" cy="46" r="4" fill="none" stroke="#FFFFFF" stroke-width="2"/>
-  <circle cx="37" cy="46" r="4" fill="none" stroke="#FFFFFF" stroke-width="2"/>
-  <line x1="28" y1="44" x2="38" y2="28" stroke="#FFFFFF" stroke-width="2"/>
-  <line x1="36" y1="44" x2="26" y2="28" stroke="#FFFFFF" stroke-width="2"/>
-  <circle cx="32" cy="38" r="2" fill="#7D5260"/>
+  <defs>
+    <radialGradient id="favBg" cx="50%" cy="40%" r="65%">
+      <stop offset="0%" stop-color="#242934"/>
+      <stop offset="60%" stop-color="#14161C"/>
+      <stop offset="100%" stop-color="#0A0B0E"/>
+    </radialGradient>
+    <linearGradient id="favGreen" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#69F0AE"/>
+      <stop offset="40%" stop-color="#00E676"/>
+      <stop offset="100%" stop-color="#00A344"/>
+    </linearGradient>
+    <linearGradient id="favBlade" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="100%" stop-color="#D5DBE1"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background Squircle -->
+  <rect width="64" height="64" rx="14" fill="url(#favBg)"/>
+  <rect width="62" height="62" x="1" y="1" rx="13" fill="none" stroke="rgba(255, 255, 255, 0.2)" stroke-width="1"/>
+
+  <!-- Left Audio Wave Bars -->
+  <g fill="url(#favGreen)">
+    <rect x="9.5"  y="25" width="2.2" height="14" rx="1.1"/>
+    <rect x="13.7" y="19" width="2.2" height="26" rx="1.1"/>
+    <rect x="18"   y="15" width="2.2" height="34" rx="1.1"/>
+    <rect x="22.2" y="11" width="2.2" height="42" rx="1.1"/>
+    <rect x="26.5" y="18" width="2.2" height="28" rx="1.1"/>
+
+    <!-- Right Audio Wave Bars -->
+    <rect x="35.3" y="18" width="2.2" height="28" rx="1.1"/>
+    <rect x="39.6" y="11" width="2.2" height="42" rx="1.1"/>
+    <rect x="43.8" y="15" width="2.2" height="34" rx="1.1"/>
+    <rect x="48.1" y="19" width="2.2" height="26" rx="1.1"/>
+    <rect x="52.3" y="25" width="2.2" height="14" rx="1.1"/>
+  </g>
+
+  <!-- Laser Seam Cut Line -->
+  <line x1="32" y1="8" x2="32" y2="56" stroke="#FFFFFF" stroke-width="1.2" stroke-dasharray="3 2" stroke-linecap="round" opacity="0.95"/>
+
+  <!-- Scissors -->
+  <g>
+    <!-- Handle Loops -->
+    <circle cx="25.2" cy="47.5" r="4.2" fill="none" stroke="url(#favGreen)" stroke-width="1.8"/>
+    <circle cx="38.8" cy="47.5" r="4.2" fill="none" stroke="url(#favGreen)" stroke-width="1.8"/>
+
+    <!-- Left to Right Blade -->
+    <path d="M 27.2 45 L 37.8 23.2 Q 38.3 22.2 37.5 22.7 L 32 33 Z" fill="url(#favBlade)" stroke="#FFFFFF" stroke-width="0.3"/>
+    <!-- Right to Left Blade -->
+    <path d="M 36.8 45 L 26.2 23.2 Q 25.7 22.2 26.5 22.7 L 32 33 Z" fill="url(#favBlade)" stroke="#FFFFFF" stroke-width="0.3"/>
+
+    <!-- Rivet -->
+    <circle cx="32" cy="34" r="1.6" fill="#14161C" stroke="url(#favGreen)" stroke-width="0.7"/>
+    <circle cx="32" cy="34" r="0.6" fill="#FFFFFF"/>
+  </g>
 </svg>

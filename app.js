@@ -62,6 +62,14 @@ let elements = {};
 // Bootstrap Entry Point
 // =============================================================================
 function bootstrap() {
+  const isTouchDevice =
+    /Android|iPhone|iPad|iPod|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+    ('maxTouchPoints' in navigator && navigator.maxTouchPoints > 0) ||
+    (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+  if (isTouchDevice) {
+    document.body.classList.add('is-touch-device');
+  }
+
   initElements();
   initEvents(); // Register all UI listeners immediately
   initWorker(); // Initialize worker with safe fallback
@@ -206,10 +214,10 @@ function initElements() {
     wheelTargetText: document.getElementById('wheelTargetText'),
     timeWheelViewport: document.getElementById('timeWheelViewport'),
     timeWheelTrack: document.getElementById('timeWheelTrack'),
-    btnWheelStepMinus10: document.getElementById('btnWheelStepMinus10'),
-    btnWheelStepMinus1: document.getElementById('btnWheelStepMinus1'),
-    btnWheelStepPlus1: document.getElementById('btnWheelStepPlus1'),
-    btnWheelStepPlus10: document.getElementById('btnWheelStepPlus10'),
+    btnWheelStepMinus60: document.getElementById('btnWheelStepMinus60'),
+    btnWheelStepMinus30: document.getElementById('btnWheelStepMinus30'),
+    btnWheelStepPlus30: document.getElementById('btnWheelStepPlus30'),
+    btnWheelStepPlus60: document.getElementById('btnWheelStepPlus60'),
 
     // iOS Install Modal
     iosInstallModal: document.getElementById('iosInstallModal'),
@@ -237,7 +245,7 @@ function initElements() {
 function initWorker() {
   try {
     if (window.Worker && window.location.protocol !== 'file:') {
-      mp3Worker = new Worker('./mp3-worker.js?v=31');
+      mp3Worker = new Worker('./mp3-worker.js?v=40');
       mp3Worker.onmessage = handleWorkerMessage;
       mp3Worker.onerror = (err) => {
         console.warn('Worker error, switching to in-thread processing:', err);
@@ -367,6 +375,17 @@ function initEvents() {
 
   // Keyboard accessibility on dropzone (Space or Enter opens picker)
   if (elements.dropzone) {
+    // Instant tactile highlight on Choose File button
+    const btnChoose = document.getElementById('btnChooseFile');
+    if (btnChoose) {
+      const addPress = () => btnChoose.classList.add('is-pressed');
+      const removePress = () => btnChoose.classList.remove('is-pressed');
+      elements.dropzone.addEventListener('pointerdown', addPress);
+      elements.dropzone.addEventListener('pointerup', removePress);
+      elements.dropzone.addEventListener('pointercancel', removePress);
+      elements.dropzone.addEventListener('mouseleave', removePress);
+    }
+
     elements.dropzone.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
@@ -597,12 +616,16 @@ function initEvents() {
       }
     });
     elements.inputRangeStart.addEventListener('blur', () => {
-      const val = parseTimeToSeconds(elements.inputRangeStart.value);
-      if (!isNaN(val)) {
-        elements.inputRangeStart.value = formatMmSs(val);
-      }
+      const endVal = parseTimeToSeconds(elements.inputRangeEnd.value) || 0;
+      let val = parseTimeToSeconds(elements.inputRangeStart.value);
+      if (isNaN(val) || val < 0) val = 0;
+      if (val > endVal) val = endVal;
+      elements.inputRangeStart.value = formatMmSs(val);
       validateRangeInputs();
       updateWheelBadges();
+      if (activeWheelTarget === 'start') {
+        scrollToWheelSec(val, 'smooth');
+      }
     });
   }
 
@@ -623,19 +646,23 @@ function initEvents() {
       }
     });
     elements.inputRangeEnd.addEventListener('blur', () => {
-      const val = parseTimeToSeconds(elements.inputRangeEnd.value);
-      if (!isNaN(val)) {
-        elements.inputRangeEnd.value = formatMmSs(val);
-      }
+      const startVal = parseTimeToSeconds(elements.inputRangeStart.value) || 0;
+      let val = parseTimeToSeconds(elements.inputRangeEnd.value);
+      if (isNaN(val) || val < startVal) val = startVal;
+      if (state.index && val > state.index.duration) val = state.index.duration;
+      elements.inputRangeEnd.value = formatMmSs(val);
       validateRangeInputs();
       updateWheelBadges();
+      if (activeWheelTarget === 'end') {
+        scrollToWheelSec(val, 'smooth');
+      }
     });
   }
 
-  if (elements.btnWheelStepMinus10) elements.btnWheelStepMinus10.addEventListener('click', () => stepWheel(-10));
-  if (elements.btnWheelStepMinus1) elements.btnWheelStepMinus1.addEventListener('click', () => stepWheel(-1));
-  if (elements.btnWheelStepPlus1) elements.btnWheelStepPlus1.addEventListener('click', () => stepWheel(1));
-  if (elements.btnWheelStepPlus10) elements.btnWheelStepPlus10.addEventListener('click', () => stepWheel(10));
+  if (elements.btnWheelStepMinus60) elements.btnWheelStepMinus60.addEventListener('click', () => stepWheel(-60));
+  if (elements.btnWheelStepMinus30) elements.btnWheelStepMinus30.addEventListener('click', () => stepWheel(-30));
+  if (elements.btnWheelStepPlus30) elements.btnWheelStepPlus30.addEventListener('click', () => stepWheel(30));
+  if (elements.btnWheelStepPlus60) elements.btnWheelStepPlus60.addEventListener('click', () => stepWheel(60));
 
   if (elements.timeWheelViewport) {
     elements.timeWheelViewport.addEventListener('scroll', onWheelViewportScroll, { passive: true });
@@ -669,16 +696,26 @@ function initEvents() {
   if (elements.timeWheelTrack) {
     elements.timeWheelTrack.addEventListener('click', (e) => {
       const item = e.target.closest('.wheel-item');
-      if (!item) return;
-      const sec = parseInt(item.dataset.sec, 10);
-      if (!isNaN(sec)) {
-        const targetInput = activeWheelTarget === 'start' ? elements.inputRangeStart : elements.inputRangeEnd;
-        if (targetInput) {
-          targetInput.value = formatMmSs(sec);
-          validateRangeInputs();
-          updateWheelBadges();
-          scrollToWheelSec(sec, 'smooth');
-        }
+      if (!item || item.classList.contains('is-disabled')) return;
+      let sec = parseInt(item.dataset.sec, 10);
+      if (isNaN(sec)) return;
+
+      const isStart = activeWheelTarget === 'start';
+      const startSec = parseTimeToSeconds(elements.inputRangeStart.value) || 0;
+      const endSec = parseTimeToSeconds(elements.inputRangeEnd.value) || 0;
+
+      if (isStart) {
+        sec = Math.max(0, Math.min(endSec, sec));
+      } else {
+        sec = Math.max(startSec, Math.min(wheelMaxSec, sec));
+      }
+
+      const targetInput = isStart ? elements.inputRangeStart : elements.inputRangeEnd;
+      if (targetInput) {
+        targetInput.value = formatMmSs(sec);
+        validateRangeInputs();
+        updateWheelBadges();
+        scrollToWheelSec(sec, 'smooth');
       }
     });
   }
@@ -2472,11 +2509,29 @@ let wheelScrollRaf = null;
 let scrollResetTimeout = null;
 let lastSelectedSec = -1;
 
+function updateWheelDisabledItems() {
+  if (!elements.timeWheelTrack) return;
+  const isStart = activeWheelTarget === 'start';
+  const startSec = parseTimeToSeconds(elements.inputRangeStart ? elements.inputRangeStart.value : '0') || 0;
+  const endSec = parseTimeToSeconds(elements.inputRangeEnd ? elements.inputRangeEnd.value : '0') || 0;
+
+  const items = elements.timeWheelTrack.children;
+  for (let i = 0; i < items.length; i++) {
+    const s = i;
+    if (isStart) {
+      items[i].classList.toggle('is-disabled', s > endSec);
+    } else {
+      items[i].classList.toggle('is-disabled', s < startSec);
+    }
+  }
+}
+
 function buildTimeWheelTrack(duration) {
   if (!elements.timeWheelTrack) return;
   const maxSec = Math.max(10, Math.ceil(duration || 300));
   if (builtWheelDuration === maxSec && elements.timeWheelTrack.childElementCount > 0) {
     wheelMaxSec = maxSec;
+    updateWheelDisabledItems();
     return;
   }
   wheelMaxSec = maxSec;
@@ -2487,11 +2542,12 @@ function buildTimeWheelTrack(duration) {
     const item = document.createElement('div');
     item.className = 'wheel-item';
     item.dataset.sec = String(s);
-    item.innerHTML = `<span class="wheel-time-fmt">${formatMmSs(s)}</span><span class="wheel-sep">•</span><span class="wheel-sec-num">${s}s</span>`;
+    item.innerHTML = `<span class="wheel-time-fmt">${formatMmSs(s)}</span>`;
     frag.appendChild(item);
   }
   elements.timeWheelTrack.innerHTML = '';
   elements.timeWheelTrack.appendChild(frag);
+  updateWheelDisabledItems();
 }
 
 function openTimeWheel(targetField = 'start') {
@@ -2500,6 +2556,8 @@ function openTimeWheel(targetField = 'start') {
 
   if (state.index && state.index.duration) {
     buildTimeWheelTrack(state.index.duration);
+  } else {
+    updateWheelDisabledItems();
   }
 
   if (elements.cardRangeStart) elements.cardRangeStart.classList.toggle('active', targetField === 'start');
@@ -2558,11 +2616,24 @@ function updateWheelBadges() {
 }
 
 function stepWheel(delta) {
-  const targetInput = activeWheelTarget === 'start' ? elements.inputRangeStart : elements.inputRangeEnd;
+  const isStart = activeWheelTarget === 'start';
+  const targetInput = isStart ? elements.inputRangeStart : elements.inputRangeEnd;
   if (!targetInput) return;
 
   const current = parseTimeToSeconds(targetInput.value) || 0;
-  const next = Math.max(0, Math.min(wheelMaxSec, Math.round(current + delta)));
+  const startSec = parseTimeToSeconds(elements.inputRangeStart ? elements.inputRangeStart.value : '0') || 0;
+  const endSec = parseTimeToSeconds(elements.inputRangeEnd ? elements.inputRangeEnd.value : '0') || 0;
+
+  let next = current + delta;
+
+  if (isStart) {
+    // Start cannot exceed End (start <= end)
+    next = Math.max(0, Math.min(endSec, Math.round(next)));
+  } else {
+    // End cannot be less than Start (end >= start)
+    next = Math.max(startSec, Math.min(wheelMaxSec, Math.round(next)));
+  }
+
   targetInput.value = formatMmSs(next);
   validateRangeInputs();
   updateWheelBadges();
@@ -2575,9 +2646,26 @@ function onWheelViewportScroll() {
   if (wheelScrollRaf) cancelAnimationFrame(wheelScrollRaf);
   wheelScrollRaf = requestAnimationFrame(() => {
     const scrollTop = elements.timeWheelViewport.scrollTop;
-    const sec = Math.max(0, Math.min(wheelMaxSec, Math.round(scrollTop / WHEEL_ITEM_HEIGHT)));
+    let sec = Math.max(0, Math.min(wheelMaxSec, Math.round(scrollTop / WHEEL_ITEM_HEIGHT)));
 
-    const targetInput = activeWheelTarget === 'start' ? elements.inputRangeStart : elements.inputRangeEnd;
+    const isStart = activeWheelTarget === 'start';
+    const startSec = parseTimeToSeconds(elements.inputRangeStart ? elements.inputRangeStart.value : '0') || 0;
+    const endSec = parseTimeToSeconds(elements.inputRangeEnd ? elements.inputRangeEnd.value : '0') || 0;
+
+    let clamped = false;
+    if (isStart) {
+      if (sec > endSec) {
+        sec = endSec;
+        clamped = true;
+      }
+    } else {
+      if (sec < startSec) {
+        sec = startSec;
+        clamped = true;
+      }
+    }
+
+    const targetInput = isStart ? elements.inputRangeStart : elements.inputRangeEnd;
     const mmSsVal = formatMmSs(sec);
     if (targetInput && targetInput.value !== mmSsVal) {
       targetInput.value = mmSsVal;
@@ -2585,6 +2673,13 @@ function onWheelViewportScroll() {
       updateWheelBadges();
     }
     updateSelectedWheelItem(sec);
+
+    if (clamped) {
+      if (scrollResetTimeout) clearTimeout(scrollResetTimeout);
+      scrollResetTimeout = setTimeout(() => {
+        scrollToWheelSec(sec, 'smooth');
+      }, 90);
+    }
   });
 }
 
@@ -2609,20 +2704,28 @@ function openRangeDialog() {
 function validateRangeInputs() {
   if (!state.index) return;
 
-  const startVal = parseTimeToSeconds(elements.inputRangeStart.value);
-  const endVal = parseTimeToSeconds(elements.inputRangeEnd.value);
+  let startVal = parseTimeToSeconds(elements.inputRangeStart.value);
+  let endVal = parseTimeToSeconds(elements.inputRangeEnd.value);
   const duration = state.index.duration;
 
+  // Enforce that user cannot select start > end
+  if (!isNaN(startVal) && !isNaN(endVal)) {
+    if (activeWheelTarget === 'start' && startVal > endVal) {
+      startVal = endVal;
+      elements.inputRangeStart.value = formatMmSs(startVal);
+    } else if (activeWheelTarget === 'end' && endVal < startVal) {
+      endVal = startVal;
+      elements.inputRangeEnd.value = formatMmSs(endVal);
+    }
+  }
+
+  // Display clean mm:ss (NO seconds conversion like 61s)
   if (elements.rangeStartHelper) {
-    elements.rangeStartHelper.textContent = isNaN(startVal)
-      ? '00:00.0 (0s)'
-      : `${formatMmSs(startVal)}.0 (${Math.round(startVal)}s)`;
+    elements.rangeStartHelper.textContent = isNaN(startVal) ? '00:00' : formatMmSs(startVal);
   }
 
   if (elements.rangeEndHelper) {
-    elements.rangeEndHelper.textContent = isNaN(endVal)
-      ? '00:00.0 (0s)'
-      : `${formatMmSs(endVal)}.0 (${Math.round(endVal)}s)`;
+    elements.rangeEndHelper.textContent = isNaN(endVal) ? '00:00' : formatMmSs(endVal);
   }
 
   let errorMsg = '';
@@ -2640,10 +2743,10 @@ function validateRangeInputs() {
 
   if (elements.rangeDurationText) {
     if (isNaN(startVal) || isNaN(endVal) || endVal <= startVal) {
-      elements.rangeDurationText.textContent = '--:-- (0s)';
+      elements.rangeDurationText.textContent = '--:--';
       if (elements.rangeDurationPill) elements.rangeDurationPill.classList.add('is-invalid');
     } else {
-      elements.rangeDurationText.textContent = `${formatMmSs(partDuration)} (${Math.round(partDuration)}s)`;
+      elements.rangeDurationText.textContent = formatMmSs(partDuration);
       if (elements.rangeDurationPill) elements.rangeDurationPill.classList.remove('is-invalid');
     }
   }
@@ -2656,6 +2759,8 @@ function validateRangeInputs() {
     elements.rangeErrorAlert.classList.add('hidden');
     elements.btnAddPartRange.disabled = false;
   }
+
+  updateWheelDisabledItems();
 }
 
 function addRangePart() {

@@ -344,17 +344,27 @@ body {
   text-align: center;
   padding: 18px 16px;
   gap: 10px;
-  border: 2px dashed var(--md-sys-color-outline);
+  border: 1.5px dashed var(--md-sys-color-outline);
   border-radius: var(--radius-md);
   background-color: var(--md-sys-color-surface-variant);
   transition: border-color 0.2s ease, background-color 0.2s ease;
   cursor: pointer;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
-.dropzone:hover,
+/* Prevent green dashed border on tap/click/focus */
+.dropzone:focus,
+.dropzone:active,
+.dropzone:focus-visible {
+  outline: none !important;
+  border-color: var(--md-sys-color-outline) !important;
+}
+
+/* Only highlight border when dragging files on desktop */
 .dropzone.drag-over {
-  border-color: var(--md-sys-color-primary);
-  background-color: rgba(0, 230, 118, 0.08);
+  border-color: var(--md-sys-color-primary) !important;
+  background-color: rgba(0, 230, 118, 0.08) !important;
 }
 
 .dropzone-icon {
@@ -367,7 +377,6 @@ body {
   transition: transform 0.2s ease;
 }
 
-.dropzone:hover .dropzone-icon,
 .dropzone.drag-over .dropzone-icon {
   transform: translateY(-2px);
 }
@@ -380,10 +389,53 @@ body {
   flex-wrap: wrap;
 }
 
+/* Choose File button highlight state */
+#btnChooseFile {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.12s cubic-bezier(0.2, 0, 0, 1), filter 0.12s ease, box-shadow 0.12s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  #btnChooseFile:hover {
+    filter: brightness(1.1);
+    box-shadow: 0 4px 16px rgba(0, 230, 118, 0.45);
+    transform: translateY(-1px);
+  }
+}
+
+/* Vibrant highlight when pressed/tapped on mobile and desktop */
+.dropzone:active #btnChooseFile,
+#btnChooseFile:active,
+#btnChooseFile.is-pressed {
+  transform: scale(0.95);
+  filter: brightness(1.15) contrast(1.05);
+  box-shadow: 0 0 20px rgba(0, 245, 118, 0.65), 0 2px 8px rgba(0, 200, 83, 0.5) !important;
+}
+
 .dropzone-hint {
   font-size: 0.875rem;
   font-weight: 500;
   color: var(--md-sys-color-on-surface-variant);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Hide dropzone hint on touch devices (Android, iOS) - only show on desktop PC */
+@media (pointer: coarse), (hover: none), (max-width: 768px) {
+  .dropzone-hint {
+    display: none !important;
+  }
+}
+
+body.is-touch-device .dropzone-hint {
+  display: none !important;
 }
 
 .dropzone-title,
@@ -1889,7 +1941,7 @@ input[type="range"]::-moz-range-thumb {
 
 .time-wheel-header {
   background-color: #14161c;
-  padding: 6px 10px;
+  padding: 6px 12px;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1921,42 +1973,84 @@ input[type="range"]::-moz-range-thumb {
 .wheel-target-name {
   color: var(--md-sys-color-primary);
   font-weight: 700;
-  font-size: 0.78rem;
+  font-size: 0.82rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
-.time-wheel-actions {
+.time-wheel-header-hint {
+  font-size: 0.72rem;
+  color: var(--md-sys-color-on-surface-variant);
+  opacity: 0.7;
+}
+
+/* 5-Column Grid Layout: [-60s] [-30s] [ Wheeler ] [+30s] [+60s] */
+.time-wheel-grid {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  height: 154px;
+  min-height: 154px;
+  background-color: #07080a;
+  position: relative;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.btn-wheel-step-box {
+  flex: 0 0 17%;
+  min-width: 44px;
+  background-color: #12141a;
+  border: none;
+  color: #e2e8f0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.88rem;
+  font-weight: 700;
   display: flex;
   align-items: center;
-  gap: 4px;
-}
-
-.btn-wheel-step {
-  background-color: #1d2028;
-  border: 1px solid #303442;
-  color: #eceff1;
-  border-radius: 5px;
-  padding: 3px 7px;
-  font-size: 0.74rem;
-  font-weight: 600;
+  justify-content: center;
   cursor: pointer;
-  transition: all 0.12s ease;
   touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.12s ease, color 0.12s ease, transform 0.08s ease;
+  border-right: 1px solid #232733;
 }
 
-.btn-wheel-step:active {
-  background-color: #10381e;
-  border-color: var(--md-sys-color-primary);
+#btnWheelStepPlus30 {
+  border-left: 1px solid #232733;
+}
+
+.btn-wheel-step-box:last-child {
+  border-right: none;
+}
+
+.btn-wheel-step-box:hover {
+  background-color: #1a1e28;
   color: var(--md-sys-color-primary);
+}
+
+.btn-wheel-step-box:active {
+  background-color: #10381e;
+  color: #00f576;
   transform: scale(0.96);
 }
 
-.time-wheel-viewport {
+.btn-wheel-step-box .step-box-val {
+  pointer-events: none;
+  letter-spacing: -0.02em;
+}
+
+.time-wheel-col {
+  flex: 1 1 32%;
   position: relative;
-  height: 140px;
-  min-height: 140px;
-  max-height: 140px;
-  flex-shrink: 0;
+  height: 100%;
+  overflow: hidden;
+  background-color: #07080a;
+}
+
+.time-wheel-viewport {
+  width: 100%;
+  height: 100%;
+  position: relative;
   background-color: #07080a;
   overflow-y: scroll;
   overflow-x: hidden !important;
@@ -1971,7 +2065,6 @@ input[type="range"]::-moz-range-thumb {
   cursor: grab;
 }
 
-/* Hide scrollbars completely across WebKit */
 .time-wheel-viewport::-webkit-scrollbar {
   display: none !important;
   width: 0 !important;
@@ -1985,13 +2078,13 @@ input[type="range"]::-moz-range-thumb {
 .time-wheel-lens {
   position: absolute;
   top: 50%;
-  left: 6px;
-  right: 6px;
+  left: 3px;
+  right: 3px;
   height: 36px;
   transform: translateY(-50%);
   border-top: 1.5px solid var(--md-sys-color-primary);
   border-bottom: 1.5px solid var(--md-sys-color-primary);
-  background: linear-gradient(90deg, rgba(0, 230, 118, 0.05), rgba(0, 230, 118, 0.12), rgba(0, 230, 118, 0.05));
+  background: linear-gradient(90deg, rgba(0, 230, 118, 0.05), rgba(0, 230, 118, 0.14), rgba(0, 230, 118, 0.05));
   box-shadow: 0 0 12px rgba(0, 230, 118, 0.25);
   border-radius: 4px;
   pointer-events: none;
@@ -1999,7 +2092,7 @@ input[type="range"]::-moz-range-thumb {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 10px;
+  padding: 0 6px;
 }
 
 .wheel-lens-arrow {
@@ -2015,7 +2108,7 @@ input[type="range"]::-moz-range-thumb {
   left: 0;
   right: 0;
   height: 48px;
-  background: linear-gradient(180deg, #07080a 15%, rgba(7, 8, 10, 0.8) 55%, transparent 100%);
+  background: linear-gradient(180deg, #07080a 20%, rgba(7, 8, 10, 0.85) 60%, transparent 100%);
   pointer-events: none;
   z-index: 3;
 }
@@ -2026,7 +2119,7 @@ input[type="range"]::-moz-range-thumb {
   left: 0;
   right: 0;
   height: 48px;
-  background: linear-gradient(0deg, #07080a 15%, rgba(7, 8, 10, 0.8) 55%, transparent 100%);
+  background: linear-gradient(0deg, #07080a 20%, rgba(7, 8, 10, 0.85) 60%, transparent 100%);
   pointer-events: none;
   z-index: 3;
 }
@@ -2035,8 +2128,8 @@ input[type="range"]::-moz-range-thumb {
   width: 100%;
   box-sizing: border-box;
   overflow: hidden;
-  padding-top: 52px;
-  padding-bottom: 52px;
+  padding-top: 59px;
+  padding-bottom: 59px;
 }
 
 .wheel-item {
@@ -2048,10 +2141,10 @@ input[type="range"]::-moz-range-thumb {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
   scroll-snap-align: center;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.92rem;
+  font-size: 0.95rem;
+  font-weight: 500;
   color: #727888;
   opacity: 0.45;
   transition: opacity 0.12s ease, color 0.12s ease;
@@ -2068,24 +2161,23 @@ input[type="range"]::-moz-range-thumb {
 
 .wheel-item.is-selected {
   color: var(--md-sys-color-primary);
-  font-size: 1.15rem;
-  font-weight: 700;
+  font-size: 1.25rem;
+  font-weight: 800;
   opacity: 1;
-  text-shadow: 0 0 10px rgba(0, 230, 118, 0.65);
+  text-shadow: 0 0 12px rgba(0, 230, 118, 0.7);
 }
 
-.wheel-sec-num {
-  font-weight: 700;
-}
-
-.wheel-sep {
-  opacity: 0.4;
-  font-size: 0.8em;
+.wheel-item.is-disabled {
+  opacity: 0.12 !important;
+  color: #334155 !important;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 .wheel-time-fmt {
-  opacity: 0.9;
-  font-size: 0.9em;
+  opacity: 1;
+  font-size: 1em;
+  letter-spacing: 0.02em;
 }
 
 .time-wheel-footer {
