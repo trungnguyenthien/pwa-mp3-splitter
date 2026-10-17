@@ -41,10 +41,13 @@ self.onmessage = function (event) {
 
 function isM4aBuffer(bytes) {
   if (bytes.length < 8) return false;
-  return (
-    (bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) ||
-    (bytes[0] === 0x66 && bytes[1] === 0x74 && bytes[2] === 0x79 && bytes[3] === 0x70)
-  );
+  const limit = Math.min(bytes.length - 4, 64);
+  for (let i = 0; i <= limit; i++) {
+    if (bytes[i] === 0x66 && bytes[i + 1] === 0x74 && bytes[i + 2] === 0x79 && bytes[i + 3] === 0x70) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function packAtom(name, payload) {

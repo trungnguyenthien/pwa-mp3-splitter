@@ -788,26 +788,34 @@ function handleFileSelected(event) {
 
 async function processSelectedFile(file) {
   const ext = (file.name.split('.').pop() || '').toLowerCase();
-  const isMp3Ext = ext === 'mp3';
+  const isSupportedExt = ext === 'mp3' || ext === 'm4a';
+  const isSupportedMime =
+    file.type === 'audio/mp4' ||
+    file.type === 'audio/x-m4a' ||
+    file.type === 'audio/m4a' ||
+    file.type === 'audio/mpeg' ||
+    file.type === 'audio/mp3';
 
-  if (!isMp3Ext && file.name.includes('.')) {
+  if (!isSupportedExt && !isSupportedMime && file.name.includes('.')) {
     const formatNames = {
-      m4a: 'M4A / AAC (Apple Audio)',
-      aac: 'AAC Audio Stream',
       wav: 'WAV (Waveform Audio)',
       flac: 'FLAC (Lossless Audio)',
       ogg: 'OGG (Vorbis/Opus)',
       wma: 'WMA Audio',
-      mp4: 'MP4 Media Container',
       webm: 'WebM Audio',
-      m4r: 'M4R iPhone Ringtone',
       aiff: 'AIFF Audio',
+      opus: 'Opus Audio',
+      mid: 'MIDI Audio',
+      midi: 'MIDI Audio',
+      mp4: 'MP4 Video Container',
+      mkv: 'MKV Video Container',
+      avi: 'AVI Video Container',
     };
     const detectedFormat = formatNames[ext] || `.${ext.toUpperCase()} Audio`;
     showFormatErrorModal(
       file.name,
       detectedFormat,
-      `You selected a file ending with <strong>.${ext}</strong>. MP3 Splitter is a lossless frame cutter strictly designed for <strong>.mp3</strong> files. Slicing non-MP3 files results in false duration calculations (e.g. only a few seconds) and broken audio files. Please convert this file to .mp3 and try again.`
+      `You selected a file ending with <strong>.${ext}</strong>. MP3 Splitter supports lossless cutting for <strong>.mp3</strong> and <strong>.m4a</strong> (Apple AAC) audio files. Please convert this file to .mp3 or .m4a and try again.`
     );
     if (elements.fileInput) elements.fileInput.value = '';
     return;
@@ -989,10 +997,15 @@ function detectAudioFileType(buffer, fileName = '') {
     const bytes = new Uint8Array(buffer, 0, Math.min(128, buffer.byteLength));
 
     // M4A / MP4: "ftyp" box (Apple MPEG-4 AAC/ALAC)
-    if (
-      (bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) ||
-      (bytes[0] === 0x66 && bytes[1] === 0x74 && bytes[2] === 0x79 && bytes[3] === 0x70)
-    ) {
+    let isM4aSignature = false;
+    const limit = Math.min(bytes.length - 4, 64);
+    for (let i = 0; i <= limit; i++) {
+      if (bytes[i] === 0x66 && bytes[i + 1] === 0x74 && bytes[i + 2] === 0x79 && bytes[i + 3] === 0x70) {
+        isM4aSignature = true;
+        break;
+      }
+    }
+    if (isM4aSignature) {
       return { isSupported: true, isMp3: false, isM4a: true, format: 'M4A' };
     }
 
