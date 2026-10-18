@@ -3,20 +3,20 @@
  * Adheres strictly to PWA Standards & WebAPK Isolation Rules
  */
 
-const CACHE_NAME = 'mp3-splitter-v47';
+const CACHE_NAME = 'mp3-splitter-v48';
 
 const PRECACHE_ASSETS = [
   './',
-  './index.html?v=47',
-  './styles.css?v=47',
-  './app.js?v=47',
-  './mp3-worker.js?v=47',
-  './manifest.webmanifest?v=47',
-  './icons/icon-192.png?v=47',
-  './icons/icon-512.png?v=47',
-  './icons/icon-maskable-512.png?v=47',
-  './icons/favicon.svg?v=47',
-  './icons/favicon.png?v=47',
+  './index.html?v=48',
+  './styles.css?v=48',
+  './app.js?v=48',
+  './mp3-worker.js?v=48',
+  './manifest.webmanifest?v=48',
+  './icons/icon-192.png?v=48',
+  './icons/icon-512.png?v=48',
+  './icons/icon-maskable-512.png?v=48',
+  './icons/favicon.svg?v=48',
+  './icons/favicon.png?v=48',
   './icons/icon-192.png',
   './icons/icon-512.png',
   './icons/icon-maskable-512.png',

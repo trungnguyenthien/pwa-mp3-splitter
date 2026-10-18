@@ -259,7 +259,7 @@ function initElements() {
 function initWorker() {
   try {
     if (window.Worker && window.location.protocol !== 'file:') {
-      mp3Worker = new Worker('./mp3-worker.js?v=47');
+      mp3Worker = new Worker('./mp3-worker.js?v=48');
       mp3Worker.onmessage = handleWorkerMessage;
       mp3Worker.onerror = (err) => {
         console.warn('Worker error, switching to in-thread processing:', err);
@@ -361,7 +361,7 @@ async function forceUpdateApp() {
     console.error('Failed to force update:', err);
     if (elements.btnUpdateApp) {
       elements.btnUpdateApp.classList.remove('updating');
-      if (elements.updateAppText) elements.updateAppText.textContent = 'Update App';
+      if (elements.updateAppText) elements.updateAppText.textContent = 'Update';
     }
     showSnackbar('Update check finished. Reloading...');
     setTimeout(() => {

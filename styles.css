@@ -202,58 +202,74 @@ body {
   border-color: transparent;
 }
 
-/* Force Update App Button */
+/* Force Update App Button (Harmonized DAW Studio Tonal Style) */
 .btn-update-app {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 32px;
-  padding: 0 12px;
-  border-radius: var(--radius-sm);
+  justify-content: center;
+  gap: 7px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: var(--radius-full);
+  font-family: inherit;
   font-size: 0.8125rem;
   font-weight: 500;
-  font-family: inherit;
-  background-color: var(--md-sys-color-surface-variant);
-  color: var(--md-sys-color-on-surface);
-  border: 1px solid var(--md-sys-color-outline-variant);
+  letter-spacing: 0.01em;
+  background-color: var(--md-sys-color-secondary-container, #262B33);
+  color: var(--md-sys-color-on-secondary-container, #ECEFF1);
+  border: 1px solid var(--md-sys-color-outline-variant, #2A2C35);
   cursor: pointer;
   user-select: none;
   touch-action: manipulation;
-  transition: all 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.2, 0, 0, 1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
 
 .btn-update-app .update-icon {
+  width: 15px;
+  height: 15px;
   flex-shrink: 0;
-  transition: transform 0.2s ease;
+  color: var(--md-sys-color-primary, #00F576);
+  stroke-width: 2.2;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .btn-update-app:hover {
-  background-color: var(--md-sys-color-surface-variant-hover, #2f3036);
-  border-color: var(--md-sys-color-primary);
-  color: var(--md-sys-color-primary);
-  box-shadow: 0 0 10px rgba(0, 245, 118, 0.25);
+  background-color: #313642;
+  border-color: rgba(0, 245, 118, 0.4);
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(0, 245, 118, 0.25);
+}
+
+.btn-update-app:hover .update-icon {
+  transform: rotate(90deg) scale(1.1);
+  color: #00F576;
 }
 
 .btn-update-app:active {
-  transform: scale(0.94);
+  transform: scale(0.96);
+  background-color: rgba(0, 245, 118, 0.12);
+  border-color: #00F576;
 }
 
 .btn-update-app.updating {
   pointer-events: none;
-  opacity: 0.85;
-  border-color: var(--md-sys-color-primary);
-  color: var(--md-sys-color-primary);
+  background-color: rgba(0, 245, 118, 0.1);
+  border-color: rgba(0, 245, 118, 0.5);
+  color: #00F576;
 }
 
 .btn-update-app.updating .update-icon {
   animation: app-spin 0.8s linear infinite;
+  color: #00F576;
 }
 
 .btn-update-app.update-ready {
-  background-color: rgba(0, 245, 118, 0.12);
-  border-color: var(--md-sys-color-primary);
-  color: var(--md-sys-color-primary);
-  box-shadow: 0 0 12px rgba(0, 245, 118, 0.35);
+  background: linear-gradient(180deg, rgba(0, 245, 118, 0.2) 0%, rgba(0, 200, 83, 0.15) 100%);
+  border-color: #00F576;
+  color: #ffffff;
+  box-shadow: 0 0 14px rgba(0, 245, 118, 0.45);
   animation: pulse-update 2s infinite ease-in-out;
 }
 
@@ -268,6 +284,15 @@ body {
   }
   50% {
     box-shadow: 0 0 16px rgba(0, 245, 118, 0.6);
+  }
+}
+
+@media (max-width: 480px) {
+  .btn-update-app {
+    height: 34px;
+    min-height: 34px;
+    padding: 0 12px;
+    font-size: 0.78125rem;
   }
 }
 
