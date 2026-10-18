@@ -29,6 +29,7 @@ const state = {
     silenceDb: -32,
     minSilenceSec: 0.35,
     minPartSec: 85,
+    maxPartSec: 300,
   },
   ui: {
     loading: false,
@@ -91,7 +92,8 @@ function initElements() {
   elements = {
     // Top bar
     btnInstall: document.getElementById('btnInstall'),
-    offlineChip: document.getElementById('offlineChip'),
+    btnUpdateApp: document.getElementById('btnUpdateApp'),
+    updateAppText: document.getElementById('updateAppText'),
 
     // Dropzone / File Picker
     dropzone: document.getElementById('dropzone'),
@@ -193,6 +195,8 @@ function initElements() {
     valMinSilence: document.getElementById('valMinSilence'),
     inputMinPart: document.getElementById('inputMinPart'),
     valMinPart: document.getElementById('valMinPart'),
+    inputMaxPart: document.getElementById('inputMaxPart'),
+    valMaxPart: document.getElementById('valMaxPart'),
     btnReanalyze: document.getElementById('btnReanalyze'),
 
     // Time Range Dialog & Time Wheel Spinner
@@ -255,7 +259,7 @@ function initElements() {
 function initWorker() {
   try {
     if (window.Worker && window.location.protocol !== 'file:') {
-      mp3Worker = new Worker('./mp3-worker.js?v=45');
+      mp3Worker = new Worker('./mp3-worker.js?v=47');
       mp3Worker.onmessage = handleWorkerMessage;
       mp3Worker.onerror = (err) => {
         console.warn('Worker error, switching to in-thread processing:', err);
@@ -313,15 +317,73 @@ function handleWorkerMessage(event) {
 }
 
 // =============================================================================
-// Service Worker Registration & PWA Standards
+// Service Worker Registration, Force Update & PWA Standards
 // =============================================================================
+async function forceUpdateApp() {
+  if (!navigator.onLine) {
+    showSnackbar('Cannot update while offline. Please connect to the internet.');
+    return;
+  }
+
+  if (elements.btnUpdateApp) {
+    elements.btnUpdateApp.classList.add('updating');
+    elements.btnUpdateApp.classList.remove('update-ready');
+    if (elements.updateAppText) elements.updateAppText.textContent = 'Updating...';
+  }
+
+  showSnackbar('Checking for updates & clearing cache...');
+
+  try {
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      for (const reg of registrations) {
+        if (reg.waiting) {
+          reg.waiting.postMessage({ action: 'skipWaiting' });
+        }
+        try {
+          await reg.update();
+        } catch (_) {}
+        await reg.unregister();
+      }
+    }
+
+    if ('caches' in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
+
+    showSnackbar('App updated! Reloading...');
+    setTimeout(() => {
+      // Force reload bypassing HTTP cache
+      window.location.href = window.location.pathname + '?forceUpdate=' + Date.now();
+    }, 400);
+  } catch (err) {
+    console.error('Failed to force update:', err);
+    if (elements.btnUpdateApp) {
+      elements.btnUpdateApp.classList.remove('updating');
+      if (elements.updateAppText) elements.updateAppText.textContent = 'Update App';
+    }
+    showSnackbar('Update check finished. Reloading...');
+    setTimeout(() => {
+      window.location.reload();
+    }, 400);
+  }
+}
+
 function initServiceWorker() {
+  if (elements.btnUpdateApp) {
+    elements.btnUpdateApp.addEventListener('click', forceUpdateApp);
+  }
+
   if ('serviceWorker' in navigator && window.location.protocol !== 'file:') {
     navigator.serviceWorker
       .register('./sw.js', { scope: './' })
       .then((reg) => {
-        if (reg.active) {
-          if (elements.offlineChip) elements.offlineChip.classList.remove('hidden');
+        if (reg.waiting) {
+          if (elements.btnUpdateApp) {
+            elements.btnUpdateApp.classList.add('update-ready');
+            if (elements.updateAppText) elements.updateAppText.textContent = 'Update Ready';
+          }
         }
 
         reg.addEventListener('updatefound', () => {
@@ -329,9 +391,11 @@ function initServiceWorker() {
           if (newWorker) {
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                newWorker.postMessage({ action: 'skipWaiting' });
-              } else if (newWorker.state === 'activated') {
-                if (elements.offlineChip) elements.offlineChip.classList.remove('hidden');
+                if (elements.btnUpdateApp) {
+                  elements.btnUpdateApp.classList.add('update-ready');
+                  if (elements.updateAppText) elements.updateAppText.textContent = 'Update Ready';
+                }
+                showSnackbar('A new update is available. Tap "Update Ready" to apply.');
               }
             });
           }
@@ -522,10 +586,11 @@ function initEvents() {
   }
 
   // Detection Presets
-  function applyDetectionPreset(db, minSil, minPart, activeBtn) {
+  function applyDetectionPreset(db, minSil, minPart, maxPart, activeBtn) {
     state.settings.silenceDb = db;
     state.settings.minSilenceSec = minSil;
     state.settings.minPartSec = minPart;
+    state.settings.maxPartSec = maxPart;
 
     if (elements.inputSilenceDb) {
       elements.inputSilenceDb.value = db;
@@ -539,6 +604,10 @@ function initEvents() {
       elements.inputMinPart.value = minPart;
       elements.valMinPart.textContent = `${minPart}s`;
     }
+    if (elements.inputMaxPart) {
+      elements.inputMaxPart.value = maxPart;
+      elements.valMaxPart.textContent = `${maxPart}s`;
+    }
 
     [elements.btnPresetMusic, elements.btnPresetSpeech, elements.btnPresetLong].forEach((btn) => {
       if (btn) btn.classList.remove('active');
@@ -550,17 +619,17 @@ function initEvents() {
 
   if (elements.btnPresetMusic) {
     elements.btnPresetMusic.addEventListener('click', () => {
-      applyDetectionPreset(-32, 0.35, 85, elements.btnPresetMusic);
+      applyDetectionPreset(-32, 0.35, 85, 300, elements.btnPresetMusic);
     });
   }
   if (elements.btnPresetSpeech) {
     elements.btnPresetSpeech.addEventListener('click', () => {
-      applyDetectionPreset(-42, 0.80, 30, elements.btnPresetSpeech);
+      applyDetectionPreset(-42, 0.80, 30, 600, elements.btnPresetSpeech);
     });
   }
   if (elements.btnPresetLong) {
     elements.btnPresetLong.addEventListener('click', () => {
-      applyDetectionPreset(-48, 1.50, 60, elements.btnPresetLong);
+      applyDetectionPreset(-48, 1.50, 60, 900, elements.btnPresetLong);
     });
   }
 
@@ -578,17 +647,106 @@ function initEvents() {
     elements.inputMinSilence.addEventListener('input', (e) => {
       state.settings.minSilenceSec = parseFloat(e.target.value);
       if (elements.valMinSilence) elements.valMinSilence.textContent = `${state.settings.minSilenceSec}s`;
+      [elements.btnPresetMusic, elements.btnPresetSpeech, elements.btnPresetLong].forEach((b) => b && b.classList.remove('active'));
       analyzeSilence();
     });
   }
 
   if (elements.inputMinPart) {
     elements.inputMinPart.addEventListener('input', (e) => {
-      state.settings.minPartSec = parseFloat(e.target.value);
+      let minVal = parseFloat(e.target.value);
+      if (minVal > state.settings.maxPartSec) {
+        state.settings.maxPartSec = minVal;
+        if (elements.inputMaxPart) elements.inputMaxPart.value = minVal;
+        if (elements.valMaxPart) elements.valMaxPart.textContent = `${minVal}s`;
+      }
+      state.settings.minPartSec = minVal;
       if (elements.valMinPart) elements.valMinPart.textContent = `${state.settings.minPartSec}s`;
+      [elements.btnPresetMusic, elements.btnPresetSpeech, elements.btnPresetLong].forEach((b) => b && b.classList.remove('active'));
       analyzeSilence();
     });
   }
+
+  if (elements.inputMaxPart) {
+    elements.inputMaxPart.addEventListener('input', (e) => {
+      let maxVal = parseFloat(e.target.value);
+      if (maxVal < state.settings.minPartSec) {
+        state.settings.minPartSec = maxVal;
+        if (elements.inputMinPart) elements.inputMinPart.value = maxVal;
+        if (elements.valMinPart) elements.valMinPart.textContent = `${maxVal}s`;
+      }
+      state.settings.maxPartSec = maxVal;
+      if (elements.valMaxPart) elements.valMaxPart.textContent = `${state.settings.maxPartSec}s`;
+      [elements.btnPresetMusic, elements.btnPresetSpeech, elements.btnPresetLong].forEach((b) => b && b.classList.remove('active'));
+      analyzeSilence();
+    });
+  }
+
+  // Slider +/- Step Buttons (Click and Hold-to-Repeat)
+  function stepSlider(targetId, direction) {
+    const input = document.getElementById(targetId);
+    if (!input) return;
+    const step = parseFloat(input.step) || 1;
+    const min = parseFloat(input.min);
+    const max = parseFloat(input.max);
+    let val = parseFloat(input.value);
+    if (isNaN(val)) val = min;
+
+    const stepStr = input.step || '1';
+    const decimals = stepStr.includes('.') ? stepStr.split('.')[1].length : 0;
+
+    let nextVal = val + direction * step;
+    nextVal = Math.round(nextVal * Math.pow(10, decimals)) / Math.pow(10, decimals);
+    nextVal = Math.max(min, Math.min(max, nextVal));
+
+    input.value = nextVal;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
+  document.querySelectorAll('.btn-slider-step').forEach((btn) => {
+    let holdTimeout = null;
+    let repeatInterval = null;
+    let didRepeat = false;
+
+    function triggerStep() {
+      const targetId = btn.dataset.target;
+      const dir = parseInt(btn.dataset.dir, 10) || 1;
+      stepSlider(targetId, dir);
+    }
+
+    function clearTimers() {
+      if (holdTimeout) clearTimeout(holdTimeout);
+      if (repeatInterval) clearInterval(repeatInterval);
+      holdTimeout = null;
+      repeatInterval = null;
+    }
+
+    btn.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0) return;
+      didRepeat = false;
+      clearTimers();
+      holdTimeout = setTimeout(() => {
+        didRepeat = true;
+        repeatInterval = setInterval(() => {
+          triggerStep();
+        }, 80);
+      }, 350);
+    });
+
+    btn.addEventListener('pointerup', clearTimers);
+    btn.addEventListener('pointercancel', clearTimers);
+    btn.addEventListener('pointerleave', clearTimers);
+
+    btn.addEventListener('click', (e) => {
+      if (didRepeat) {
+        didRepeat = false;
+        e.preventDefault();
+        return;
+      }
+      triggerStep();
+    });
+  });
 
   if (elements.btnReanalyze) {
     elements.btnReanalyze.addEventListener('click', () => {
@@ -2318,7 +2476,57 @@ function analyzeSilence() {
     }
   }
 
-  state.suggestions = filteredCandidates.map((cand, idx) => {
+  // 7. Enforce maxPartSec: subdivide any candidate parts that exceed maxPartSec
+  const maxPartSec = state.settings.maxPartSec || 300;
+  const finalCandidates = [];
+
+  for (const cand of filteredCandidates) {
+    let subStart = cand.start;
+    while (cand.end - subStart > maxPartSec) {
+      const remDur = cand.end - subStart;
+      const numPiecesLeft = Math.ceil(remDur / maxPartSec);
+      const targetChunk = remDur / numPiecesLeft;
+      const targetTime = subStart + targetChunk;
+
+      const minCut = subStart + Math.min(minPartSec, targetChunk * 0.5);
+      const maxCut = subStart + maxPartSec;
+      const searchRadius = Math.min(targetChunk * 0.25, 12.0);
+      const searchMin = Math.max(minCut, targetTime - searchRadius);
+      const searchMax = Math.min(maxCut, targetTime + searchRadius);
+
+      let bestCutSec = targetTime;
+      if (searchMax > searchMin) {
+        const startW = Math.max(0, Math.floor(searchMin / windowSec));
+        const endW = Math.min(smoothed.length - 1, Math.ceil(searchMax / windowSec));
+        let minLoud = Infinity;
+        let bestW = Math.floor(targetTime / windowSec);
+        for (let w = startW; w <= endW; w++) {
+          if (smoothed[w] < minLoud) {
+            minLoud = smoothed[w];
+            bestW = w;
+          }
+        }
+        bestCutSec = bestW * windowSec;
+      }
+
+      let snappedCut = Math.round(bestCutSec / frameDuration) * frameDuration;
+      if (snappedCut > subStart + maxPartSec) {
+        snappedCut = Math.floor((subStart + maxPartSec) / frameDuration) * frameDuration;
+      }
+      if (snappedCut <= subStart) {
+        snappedCut = subStart + frameDuration;
+      }
+
+      finalCandidates.push({ start: subStart, end: snappedCut });
+      subStart = snappedCut;
+    }
+
+    if (cand.end > subStart) {
+      finalCandidates.push({ start: subStart, end: cand.end });
+    }
+  }
+
+  state.suggestions = finalCandidates.map((cand, idx) => {
     const padNum = String(idx + 1).padStart(2, '0');
     return {
       id: 'sug_' + Date.now() + '_' + idx,

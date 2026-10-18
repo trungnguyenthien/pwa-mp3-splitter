@@ -71,8 +71,21 @@ iOS Safari không tự động áp dụng đầy đủ thuộc tính từ manife
   - Lắng nghe sự kiện `appinstalled` để ẩn nút và xác nhận cài đặt thành công.
 - **Gợi ý cài đặt cho iOS Safari**:
   - Do iOS Safari không hỗ trợ `beforeinstallprompt`, nếu phát hiện đang chạy trên iOS Safari ở chế độ trình duyệt (không phải standalone), cung cấp một gợi ý ngắn gọn (tooltip/modal): *"Nhấn nút Chia sẻ (Share) ⎋ rồi chọn 'Thêm vào Màn hình chính' (Add to Home Screen) ⊕"*.
-- **Thông báo cập nhật bản mới (In-App Update Flow)**:
-  - Khi phát hiện Service Worker mới ở trạng thái `waiting`, hiển thị một Snackbar / Toast: *"Đã có bản cập nhật mới — Tải lại"* cùng nút bấm xác nhận.
+- **Thông báo cập nhật bản mới & Nút "Update App" Chủ Động (Force Update Flow)**:
+  - **Tắt pull-to-refresh mặc định của trình duyệt**: Trong các ứng dụng PWA (đặc biệt là ứng dụng xử lý audio, video, form hoặc dữ liệu đang thao tác trong bộ nhớ), cử chỉ vuốt kéo từ trên xuống (pull-down) của Android Chrome và iOS Safari sẽ tự động kích hoạt tính năng pull-to-refresh của trình duyệt, làm tải lại trang và xóa sạch dữ liệu người dùng đang thao tác dở dang. Bắt buộc cấu hình trong CSS:
+    ```css
+    html, body {
+      overscroll-behavior-y: none; /* Vô hiệu hóa pull-to-refresh và hiệu ứng nảy rubber-band */
+    }
+    ```
+  - **Nút "Update App" trên Top App Bar**: Thay vì phụ thuộc vào cử chỉ vuốt pull-to-refresh (đã bị tắt) hoặc badge thụ động "Offline Ready", bố trí nút **"Update App"** (`#btnUpdateApp`) trên Top App Bar cho phép người dùng chủ động nhấn để kiểm tra và ép cập nhật (Force Update) app lên bản mới nhất:
+    1. Kiểm tra kết nối mạng (`navigator.onLine`). Nếu offline, thông báo *"Không thể cập nhật khi đang offline"*.
+    2. Đưa nút sang trạng thái đang cập nhật: icon xoay spinner, nhãn *"Updating..."*, vô hiệu hóa bấm lặp.
+    3. Gọi `registration.update()` để kiểm tra worker mới từ server/CDN.
+    4. Nếu có worker đang `waiting`, gửi `{ action: 'skipWaiting' }`.
+    5. Dọn sạch cache cũ (`caches.delete()`) và unregister Service Worker cũ để ép tải bản mới nhất.
+    6. Tự động reload ứng dụng (`window.location.href = window.location.pathname + '?forceUpdate=' + Date.now()`).
+  - Khi phát hiện Service Worker mới ở trạng thái `waiting`, nút "Update App" tự động chuyển sang trạng thái nổi bật (viền sáng neon, nhãn *"Update Ready"*), đồng thời hiển thị Snackbar: *"Đã có bản cập nhật mới! Nhấn 'Update Ready' để áp dụng."*
   - Tuyệt đối không tự ý reload trang khi người dùng đang thao tác dở dang; chỉ reload khi người dùng bấm xác nhận hoặc khi ứng dụng được khởi động lại.
 
 ## 7. Xử lý Tác vụ Nặng & Quản lý Bộ nhớ (Web Worker & Memory Safety)

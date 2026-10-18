@@ -101,10 +101,12 @@ html {
   scroll-behavior: smooth;
   max-width: 100vw;
   overflow-x: hidden;
+  overscroll-behavior-y: none; /* Disable browser native pull-to-refresh & rubber-banding */
 }
 
 body {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   background-color: var(--md-sys-color-background);
@@ -114,6 +116,7 @@ body {
   padding-right: var(--safe-right);
   max-width: 100vw;
   overflow-x: hidden;
+  overscroll-behavior-y: none; /* Disable browser native pull-to-refresh & rubber-banding */
 }
 
 /* Tabular numbers for all time and metrics */
@@ -197,6 +200,75 @@ body {
   background-color: var(--md-sys-color-success-container);
   color: var(--md-sys-color-on-success-container);
   border-color: transparent;
+}
+
+/* Force Update App Button */
+.btn-update-app {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: var(--md-sys-color-surface-variant);
+  color: var(--md-sys-color-on-surface);
+  border: 1px solid var(--md-sys-color-outline-variant);
+  cursor: pointer;
+  user-select: none;
+  touch-action: manipulation;
+  transition: all 0.15s ease;
+}
+
+.btn-update-app .update-icon {
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.btn-update-app:hover {
+  background-color: var(--md-sys-color-surface-variant-hover, #2f3036);
+  border-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-primary);
+  box-shadow: 0 0 10px rgba(0, 245, 118, 0.25);
+}
+
+.btn-update-app:active {
+  transform: scale(0.94);
+}
+
+.btn-update-app.updating {
+  pointer-events: none;
+  opacity: 0.85;
+  border-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-primary);
+}
+
+.btn-update-app.updating .update-icon {
+  animation: app-spin 0.8s linear infinite;
+}
+
+.btn-update-app.update-ready {
+  background-color: rgba(0, 245, 118, 0.12);
+  border-color: var(--md-sys-color-primary);
+  color: var(--md-sys-color-primary);
+  box-shadow: 0 0 12px rgba(0, 245, 118, 0.35);
+  animation: pulse-update 2s infinite ease-in-out;
+}
+
+@keyframes app-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse-update {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(0, 245, 118, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(0, 245, 118, 0.6);
+  }
 }
 
 /* Buttons */
@@ -1108,6 +1180,8 @@ body.is-touch-device .dropzone-hint {
 }
 
 .dialog-body {
+  flex: 1;
+  min-height: 0;
   padding: 20px 24px;
   overflow-y: auto;
   display: flex;
@@ -2405,6 +2479,7 @@ input[type="range"]::-moz-range-thumb {
   border: 1px solid var(--md-sys-color-outline-variant);
   border-radius: var(--radius-sm);
   padding: 8px;
+  flex-shrink: 0;
 }
 
 .suggestion-row {
@@ -2469,6 +2544,7 @@ input[type="range"]::-moz-range-thumb {
 
 /* Advanced Accordion */
 .accordion {
+  flex-shrink: 0;
   border: 1px solid var(--md-sys-color-outline-variant);
   border-radius: var(--radius-sm);
   overflow: hidden;
@@ -2504,7 +2580,7 @@ input[type="range"]::-moz-range-thumb {
 .slider-group {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 .slider-header {
@@ -2512,6 +2588,61 @@ input[type="range"]::-moz-range-thumb {
   justify-content: space-between;
   font-size: 0.8125rem;
   color: var(--md-sys-color-on-surface-variant);
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+
+.slider-row input[type="range"] {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+.btn-slider-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid var(--md-sys-color-outline-variant);
+  background: var(--md-sys-color-surface-container, #202227);
+  color: var(--md-sys-color-on-surface);
+  cursor: pointer;
+  user-select: none;
+  touch-action: manipulation;
+  transition: all 0.15s cubic-bezier(0.2, 0, 0, 1);
+}
+
+.btn-slider-step svg {
+  display: block;
+  pointer-events: none;
+}
+
+.btn-slider-step:hover {
+  background: var(--md-sys-color-surface-variant, #35383f);
+  border-color: var(--md-sys-color-primary);
+  color: #ffffff;
+  box-shadow: 0 0 10px rgba(0, 245, 118, 0.3);
+}
+
+.btn-slider-step:active {
+  transform: scale(0.92);
+  background: rgba(0, 245, 118, 0.18);
+  border-color: var(--md-sys-color-primary);
+}
+
+.btn-slider-step:focus-visible {
+  outline: 2px solid var(--md-sys-color-primary);
+  outline-offset: 2px;
 }
 
 /* Preset Chips */
