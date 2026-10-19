@@ -26,10 +26,10 @@ const state = {
   parts: [], // [{ id, name, start, end, status: 'idle'|'working'|'done'|'error', blobUrl, lastBlob }]
   suggestions: [], // [{ id, name, start, end, duration, selected }]
   settings: {
-    silenceDb: -32,
-    minSilenceSec: 0.35,
-    minPartSec: 85,
-    maxPartSec: 300,
+    silenceDb: -38,
+    minSilenceSec: 0.8,
+    minPartSec: 150,
+    maxPartSec: 360,
   },
   ui: {
     loading: false,
@@ -259,7 +259,7 @@ function initElements() {
 function initWorker() {
   try {
     if (window.Worker && window.location.protocol !== 'file:') {
-      mp3Worker = new Worker('./mp3-worker.js?v=49');
+      mp3Worker = new Worker('./mp3-worker.js?v=50');
       mp3Worker.onmessage = handleWorkerMessage;
       mp3Worker.onerror = (err) => {
         console.warn('Worker error, switching to in-thread processing:', err);
@@ -619,7 +619,7 @@ function initEvents() {
 
   if (elements.btnPresetMusic) {
     elements.btnPresetMusic.addEventListener('click', () => {
-      applyDetectionPreset(-32, 0.35, 85, 300, elements.btnPresetMusic);
+      applyDetectionPreset(-38, 0.8, 150, 360, elements.btnPresetMusic);
     });
   }
   if (elements.btnPresetSpeech) {
@@ -2330,134 +2330,179 @@ function analyzeSilence(options = {}) {
   const windowSec = 0.05;
   const frameDuration = state.index.frameDuration;
 
-  const baseThresholdDb = Math.round(state.settings.silenceDb);
-  const minSilenceSec = state.settings.minSilenceSec;
-  const minPartSec = state.settings.minPartSec;
-  const maxPartSec = state.settings.maxPartSec || 300;
+  const baseThresholdDb = Math.round(state.settings.silenceDb ?? -38);
+  const minSilenceSec = state.settings.minSilenceSec ?? 0.8;
+  const minPartSec = state.settings.minPartSec ?? 150;
+  const maxPartSec = state.settings.maxPartSec || 360;
 
+  const bridgeWindows = Math.round(2.0 / windowSec);
   const minSilenceWindows = Math.max(3, Math.round(minSilenceSec / windowSec));
 
-  // 1. Moving Average Smoothing (3-window, ~150ms) to filter out transient pops/spikes
-  const smoothed = new Float32Array(peaks.length);
-  for (let i = 0; i < peaks.length; i++) {
-    const prev = i > 0 ? peaks[i - 1] : peaks[i];
-    const curr = peaks[i];
-    const next = i < peaks.length - 1 ? peaks[i + 1] : peaks[i];
-    smoothed[i] = (prev + curr + next) / 3;
-  }
+  // Helper: Solve optimal partition for any test threshold dB
+  function solvePartitionForThreshold(testDb) {
+    // 1. Identify quiet frames
+    const isQuiet = new Uint8Array(peaks.length);
+    for (let i = 0; i < peaks.length; i++) {
+      if (peaks[i] <= testDb) isQuiet[i] = 1;
+    }
 
-  // Helper: Detect candidate silence cuts for any given threshold dB
-  function detectCutsForThreshold(testDb) {
-    const silentRanges = [];
-    let inSilence = false;
-    let silenceStartIdx = 0;
+    // 2. Morphological bridging: join transient noises/clicks <= 2.0s between quiet frames
+    let gapStart = -1;
+    for (let i = 0; i < isQuiet.length; i++) {
+      if (!isQuiet[i]) {
+        if (gapStart === -1) gapStart = i;
+      } else {
+        if (gapStart !== -1) {
+          if (i - gapStart <= bridgeWindows && gapStart > 0) {
+            for (let k = gapStart; k < i; k++) isQuiet[k] = 1;
+          }
+          gapStart = -1;
+        }
+      }
+    }
 
-    for (let i = 0; i < smoothed.length; i++) {
-      if (smoothed[i] <= testDb) {
-        if (!inSilence) {
-          inSilence = true;
-          silenceStartIdx = i;
+    // 3. Extract candidate silence ranges
+    const candidateCuts = [];
+    let inQ = false;
+    let startQ = 0;
+
+    for (let i = 0; i < isQuiet.length; i++) {
+      if (isQuiet[i]) {
+        if (!inQ) {
+          inQ = true;
+          startQ = i;
         }
       } else {
-        if (inSilence) {
-          inSilence = false;
-          const silenceLen = i - silenceStartIdx;
-          if (silenceLen >= minSilenceWindows) {
-            let minLoudness = smoothed[silenceStartIdx];
-            let minRaw = peaks[silenceStartIdx];
-            for (let j = silenceStartIdx; j < i; j++) {
-              if (smoothed[j] < minLoudness) minLoudness = smoothed[j];
-              if (peaks[j] < minRaw) minRaw = peaks[j];
+        if (inQ) {
+          inQ = false;
+          const len = i - startQ;
+          if (len >= minSilenceWindows) {
+            let minRaw = 0;
+            let minW = startQ;
+            for (let k = startQ; k < i; k++) {
+              if (peaks[k] < minRaw) {
+                minRaw = peaks[k];
+                minW = k;
+              }
             }
-            if (minLoudness <= testDb - 1.5 || minLoudness <= -34.0) {
-              silentRanges.push({
-                startIdx: silenceStartIdx,
-                endIdx: i,
-                minLoudness: minLoudness,
-                minRaw: minRaw,
-                span: (i - silenceStartIdx) * windowSec,
-              });
+            if (minRaw <= testDb - 1.0 || minRaw <= -44.0) {
+              const cutSec = minW * windowSec;
+              const snappedTime = Math.round(cutSec / frameDuration) * frameDuration;
+              if (
+                snappedTime >= Math.min(minPartSec * 0.5, 30) &&
+                snappedTime <= duration - Math.min(minPartSec * 0.5, 30)
+              ) {
+                candidateCuts.push({
+                  time: snappedTime,
+                  minRaw,
+                  span: len * windowSec,
+                });
+              }
             }
           }
         }
       }
     }
 
-    if (inSilence && smoothed.length - silenceStartIdx >= minSilenceWindows) {
-      let minLoudness = smoothed[silenceStartIdx];
-      let minRaw = peaks[silenceStartIdx];
-      for (let j = silenceStartIdx; j < smoothed.length; j++) {
-        if (smoothed[j] < minLoudness) minLoudness = smoothed[j];
-        if (peaks[j] < minRaw) minRaw = peaks[j];
+    if (inQ && isQuiet.length - startQ >= minSilenceWindows) {
+      let minRaw = 0;
+      let minW = startQ;
+      for (let k = startQ; k < isQuiet.length; k++) {
+        if (peaks[k] < minRaw) {
+          minRaw = peaks[k];
+          minW = k;
+        }
       }
-      if (minLoudness <= testDb - 1.5 || minLoudness <= -34.0) {
-        silentRanges.push({
-          startIdx: silenceStartIdx,
-          endIdx: smoothed.length,
-          minLoudness: minLoudness,
-          minRaw: minRaw,
-          span: (smoothed.length - silenceStartIdx) * windowSec,
-        });
+      if (minRaw <= testDb - 1.0 || minRaw <= -44.0) {
+        const cutSec = minW * windowSec;
+        const snappedTime = Math.round(cutSec / frameDuration) * frameDuration;
+        if (
+          snappedTime >= Math.min(minPartSec * 0.5, 30) &&
+          snappedTime <= duration - Math.min(minPartSec * 0.5, 30)
+        ) {
+          candidateCuts.push({
+            time: snappedTime,
+            minRaw,
+            span: (isQuiet.length - startQ) * windowSec,
+          });
+        }
       }
     }
 
-    // Cut points at 35% of silence gap, snapped to MP3 frame boundary
-    const candidateCuts = [];
-    silentRanges.forEach((range) => {
-      const rangeSpan = range.span;
-      const cutSec = (range.startIdx * windowSec) + rangeSpan * 0.35;
-      const snappedTime = Math.round(cutSec / frameDuration) * frameDuration;
-      if (snappedTime >= 4.0 && snappedTime <= duration - 4.0) {
-        candidateCuts.push({
-          time: snappedTime,
-          minLoudness: range.minLoudness,
-          minRaw: range.minRaw,
-          span: rangeSpan,
-        });
+    // 4. Merge candidate cuts from the same inter-track transition within 12s
+    const mergedCuts = [];
+    candidateCuts.sort((a, b) => a.time - b.time);
+    for (const cut of candidateCuts) {
+      if (mergedCuts.length === 0) {
+        mergedCuts.push([cut]);
+      } else {
+        const lastGroup = mergedCuts[mergedCuts.length - 1];
+        if (cut.time - lastGroup[lastGroup.length - 1].time <= 12.0) {
+          lastGroup.push(cut);
+        } else {
+          mergedCuts.push([cut]);
+        }
       }
+    }
+
+    const distinctCuts = mergedCuts.map((group) => {
+      let best = group[0];
+      for (let i = 1; i < group.length; i++) {
+        if (group[i].minRaw < best.minRaw - 1.0) {
+          best = group[i];
+        } else if (Math.abs(group[i].minRaw - best.minRaw) <= 1.0 && group[i].span > best.span) {
+          best = group[i];
+        }
+      }
+      return best;
     });
 
-    // Cluster cuts closer than minPartSec, picking the deepest silence valley
-    const clusters = [];
-    for (const cut of candidateCuts) {
-      if (clusters.length === 0) {
-        clusters.push([cut]);
-      } else {
-        const lastCluster = clusters[clusters.length - 1];
-        if (cut.time - lastCluster[lastCluster.length - 1].time < minPartSec) {
-          lastCluster.push(cut);
+    // 5. Dynamic Programming to find global optimal track cuts
+    const points = [{ time: 0, minRaw: -60, span: 1 }, ...distinctCuts, { time: duration, minRaw: -60, span: 1 }];
+    const N = points.length;
+    const dp = new Float64Array(N).fill(Infinity);
+    const parent = new Int32Array(N).fill(-1);
+    dp[0] = 0;
+
+    for (let j = 1; j < N; j++) {
+      for (let i = 0; i < j; i++) {
+        const dur = points[j].time - points[i].time;
+        let cost = 0;
+
+        if (dur < minPartSec) {
+          cost += 1000000 + Math.pow(minPartSec - dur, 2) * 100;
+        } else if (dur > maxPartSec) {
+          cost += 1000000 + Math.pow(dur - maxPartSec, 2) * 100;
         } else {
-          clusters.push([cut]);
+          const silencePenalty = Math.max(0, points[j].minRaw + 60) * 10;
+          const spanBonus = Math.min(10, points[j].span) * 10;
+          cost += silencePenalty - spanBonus;
+        }
+
+        const totalCost = dp[i] + cost;
+        if (totalCost < dp[j]) {
+          dp[j] = totalCost;
+          parent[j] = i;
         }
       }
     }
 
-    const finalCuts = [];
-    for (const cluster of clusters) {
-      let best = cluster[0];
-      for (let c = 1; c < cluster.length; c++) {
-        if (
-          cluster[c].minRaw < best.minRaw - 1.0 ||
-          (Math.abs(cluster[c].minRaw - best.minRaw) <= 1.0 && cluster[c].minLoudness < best.minLoudness - 0.5) ||
-          (Math.abs(cluster[c].minRaw - best.minRaw) <= 1.0 && Math.abs(cluster[c].minLoudness - best.minLoudness) <= 0.5 && cluster[c].span > best.span)
-        ) {
-          best = cluster[c];
-        }
-      }
-      finalCuts.push(best.time);
+    const chosen = [];
+    let curr = N - 1;
+    while (curr > 0) {
+      chosen.push(curr);
+      curr = parent[curr];
     }
+    chosen.reverse();
 
-    return finalCuts;
-  }
+    const cuts = chosen.slice(0, -1).map((idx) => points[idx].time);
 
-  // Helper: Evaluate parts violations and penalty score
-  function evaluateCuts(cuts) {
+    // 6. Evaluate part durations & penalties
     const boundaries = [0, ...cuts, duration];
     let shortCount = 0;
     let longCount = 0;
     let shortPenalty = 0;
     let longPenalty = 0;
-
     for (let i = 0; i < boundaries.length - 1; i++) {
       const dur = boundaries[i + 1] - boundaries[i];
       if (dur < minPartSec) {
@@ -2475,42 +2520,37 @@ function analyzeSilence(options = {}) {
       longCount,
       totalViolations: shortCount + longCount,
       penalty: shortPenalty * 2.0 + longPenalty * 1.5,
+      cost: dp[N - 1],
+      testDb,
     };
   }
 
-  // 2. Base Evaluation with current silence threshold (làm chuẩn)
-  const baseCuts = detectCutsForThreshold(baseThresholdDb);
-  const baseEval = evaluateCuts(baseCuts);
-  let bestEval = baseEval;
+  // Base evaluation with current silence threshold (làm chuẩn)
+  const baseRes = solvePartitionForThreshold(baseThresholdDb);
+  let bestRes = baseRes;
   let bestDb = baseThresholdDb;
-  let bestCuts = baseCuts;
   let wasAutoTuned = false;
 
-  // 3. Adaptive Threshold Search: nếu vi phạm min/max, tìm ngưỡng tăng/giảm tối ưu
-  if (!options.skipAutoTune && bestEval.totalViolations > 0) {
-    let minPenaltyScore = bestEval.penalty;
-    let minViolations = bestEval.totalViolations;
+  // Adaptive threshold search: nếu vi phạm min/max, quét tìm ngưỡng tối ưu
+  if (!options.skipAutoTune && baseRes.totalViolations > 0) {
+    let minPenaltyScore = baseRes.penalty;
+    let minViolations = baseRes.totalViolations;
 
-    // Quét dải ngưỡng từ -60 dB đến -20 dB (step 1 dB)
-    for (let testDb = -60; testDb <= -20; testDb++) {
+    for (let testDb = -54; testDb <= -24; testDb++) {
       if (testDb === baseThresholdDb) continue;
-      const cuts = detectCutsForThreshold(testDb);
-      const ev = evaluateCuts(cuts);
+      const res = solvePartitionForThreshold(testDb);
+      const distPenalty = Math.abs(testDb - baseThresholdDb) * 0.2;
+      const score = res.penalty + distPenalty;
 
-      // Phạt nhẹ khoảng cách với ngưỡng ban đầu để ưu tiên giữ gần mốc của user nhất
-      const distPenalty = Math.abs(testDb - baseThresholdDb) * 0.15;
-      const score = ev.penalty + distPenalty;
-
-      if (ev.totalViolations < minViolations || (ev.totalViolations === minViolations && score < minPenaltyScore)) {
-        minViolations = ev.totalViolations;
+      if (res.totalViolations < minViolations || (res.totalViolations === minViolations && score < minPenaltyScore)) {
+        minViolations = res.totalViolations;
         minPenaltyScore = score;
         bestDb = testDb;
-        bestCuts = cuts;
-        bestEval = ev;
+        bestRes = res;
       }
     }
 
-    if (bestDb !== baseThresholdDb && minViolations < baseEval.totalViolations) {
+    if (bestDb !== baseThresholdDb && minViolations < baseRes.totalViolations) {
       wasAutoTuned = true;
       state.settings.silenceDb = bestDb;
       state.autoTunedFrom = baseThresholdDb;
@@ -2524,35 +2564,16 @@ function analyzeSilence(options = {}) {
     state.autoTunedFrom = null;
   }
 
-  // 4. Candidate parts between cut points
-  const candidateBoundaries = [0, ...bestCuts, duration];
+  // Construct parts from cuts
+  const candidateBoundaries = [0, ...bestRes.cuts, duration];
   const candidateParts = [];
   for (let i = 0; i < candidateBoundaries.length - 1; i++) {
     candidateParts.push({ start: candidateBoundaries[i], end: candidateBoundaries[i + 1] });
   }
 
-  // 5. Merge edge candidates shorter than minPartSec if needed
-  const filteredCandidates = [];
-  for (let i = 0; i < candidateParts.length; i++) {
-    const cand = candidateParts[i];
-    if (filteredCandidates.length === 0) {
-      if (cand.end - cand.start < minPartSec && candidateParts.length > 1) {
-        candidateParts[1].start = cand.start;
-        continue;
-      }
-      filteredCandidates.push({ ...cand });
-    } else {
-      if (cand.end - cand.start < minPartSec) {
-        filteredCandidates[filteredCandidates.length - 1].end = cand.end;
-      } else {
-        filteredCandidates.push({ ...cand });
-      }
-    }
-  }
-
-  // 6. Enforce maxPartSec (Local fallback for stubborn long passages)
+  // Enforce maxPartSec fallback (guarantee strict adherence to maxPartSec if unbroken passage occurs)
   const finalCandidates = [];
-  for (const cand of filteredCandidates) {
+  for (const cand of candidateParts) {
     let subStart = cand.start;
     while (cand.end - subStart > maxPartSec) {
       const remDur = cand.end - subStart;
@@ -2569,12 +2590,12 @@ function analyzeSilence(options = {}) {
       let bestCutSec = targetTime;
       if (searchMax > searchMin) {
         const startW = Math.max(0, Math.floor(searchMin / windowSec));
-        const endW = Math.min(smoothed.length - 1, Math.ceil(searchMax / windowSec));
+        const endW = Math.min(peaks.length - 1, Math.ceil(searchMax / windowSec));
         let minLoud = Infinity;
         let bestW = Math.floor(targetTime / windowSec);
         for (let w = startW; w <= endW; w++) {
-          if (smoothed[w] < minLoud) {
-            minLoud = smoothed[w];
+          if (peaks[w] < minLoud) {
+            minLoud = peaks[w];
             bestW = w;
           }
         }

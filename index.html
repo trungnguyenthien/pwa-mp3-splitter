@@ -15,14 +15,14 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="MP3 Splitter">
-  <link rel="apple-touch-icon" href="./icons/icon-192.png?v=49">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png?v=50">
 
   <!-- Favicons -->
-  <link rel="icon" type="image/svg+xml" href="./icons/favicon.svg?v=49">
-  <link rel="icon" type="image/png" href="./icons/favicon.png?v=49">
+  <link rel="icon" type="image/svg+xml" href="./icons/favicon.svg?v=50">
+  <link rel="icon" type="image/png" href="./icons/favicon.png?v=50">
 
   <!-- Versioned Stylesheet adhering to pwa-standards.md -->
-  <link rel="stylesheet" href="./styles.css?v=49">
+  <link rel="stylesheet" href="./styles.css?v=50">
 </head>
 <body>
 
@@ -305,7 +305,7 @@
             <div style="margin-bottom: 4px;">
               <div style="font-size: 0.8125rem; font-weight: 500; margin-bottom: 6px; color: var(--md-sys-color-on-surface-variant);">Detection Presets</div>
               <div class="preset-chips">
-                <button type="button" id="btnPresetMusic" class="preset-chip active">Music Album / Mix (0.35s, -32dB, 85s–300s)</button>
+                <button type="button" id="btnPresetMusic" class="preset-chip active">Music Album / Mix (0.8s, -38dB, 150s–360s)</button>
                 <button type="button" id="btnPresetSpeech" class="preset-chip">Speech / Podcast (0.8s, -42dB, 30s–600s)</button>
                 <button type="button" id="btnPresetLong" class="preset-chip">Deep Pause (1.5s, -48dB, 60s–900s)</button>
               </div>
@@ -314,13 +314,13 @@
             <div class="slider-group">
               <div class="slider-header">
                 <label for="inputSilenceDb">Silence Threshold (dB)</label>
-                <span id="valSilenceDb" class="tabular-nums">-32 dB</span>
+                <span id="valSilenceDb" class="tabular-nums">-38 dB</span>
               </div>
               <div class="slider-row">
                 <button type="button" class="btn-slider-step" data-target="inputSilenceDb" data-dir="-1" aria-label="Decrease Silence Threshold">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 </button>
-                <input type="range" id="inputSilenceDb" min="-60" max="-20" step="1" value="-32">
+                <input type="range" id="inputSilenceDb" min="-60" max="-20" step="1" value="-38">
                 <button type="button" class="btn-slider-step" data-target="inputSilenceDb" data-dir="1" aria-label="Increase Silence Threshold">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 </button>
@@ -330,13 +330,13 @@
             <div class="slider-group">
               <div class="slider-header">
                 <label for="inputMinSilence">Min Silence Duration (s)</label>
-                <span id="valMinSilence" class="tabular-nums">0.35s</span>
+                <span id="valMinSilence" class="tabular-nums">0.80s</span>
               </div>
               <div class="slider-row">
                 <button type="button" class="btn-slider-step" data-target="inputMinSilence" data-dir="-1" aria-label="Decrease Min Silence Duration">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 </button>
-                <input type="range" id="inputMinSilence" min="0.10" max="3.0" step="0.05" value="0.35">
+                <input type="range" id="inputMinSilence" min="0.10" max="3.0" step="0.05" value="0.80">
                 <button type="button" class="btn-slider-step" data-target="inputMinSilence" data-dir="1" aria-label="Increase Min Silence Duration">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 </button>
@@ -346,13 +346,13 @@
             <div class="slider-group">
               <div class="slider-header">
                 <label for="inputMinPart">Min Part Duration (s)</label>
-                <span id="valMinPart" class="tabular-nums">85s</span>
+                <span id="valMinPart" class="tabular-nums">150s</span>
               </div>
               <div class="slider-row">
                 <button type="button" class="btn-slider-step" data-target="inputMinPart" data-dir="-1" aria-label="Decrease Min Part Duration">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 </button>
-                <input type="range" id="inputMinPart" min="10" max="300" step="5" value="85">
+                <input type="range" id="inputMinPart" min="10" max="600" step="5" value="150">
                 <button type="button" class="btn-slider-step" data-target="inputMinPart" data-dir="1" aria-label="Increase Min Part Duration">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 </button>
@@ -362,13 +362,13 @@
             <div class="slider-group">
               <div class="slider-header">
                 <label for="inputMaxPart">Max Part Duration (s)</label>
-                <span id="valMaxPart" class="tabular-nums">300s</span>
+                <span id="valMaxPart" class="tabular-nums">360s</span>
               </div>
               <div class="slider-row">
                 <button type="button" class="btn-slider-step" data-target="inputMaxPart" data-dir="-1" aria-label="Decrease Max Part Duration">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 </button>
-                <input type="range" id="inputMaxPart" min="30" max="1800" step="5" value="300">
+                <input type="range" id="inputMaxPart" min="30" max="1800" step="5" value="360">
                 <button type="button" class="btn-slider-step" data-target="inputMaxPart" data-dir="1" aria-label="Increase Max Part Duration">
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                 </button>
@@ -838,6 +838,6 @@
   </div>
 
   <!-- Application Logic with Cache-Busting adhering to pwa-standards.md -->
-  <script defer src="./app.js?v=49"></script>
+  <script defer src="./app.js?v=50"></script>
 </body>
 </html>
