@@ -1779,7 +1779,7 @@ function parseM4aIndexDirect(buffer) {
     stsd: bytes.slice(stsd.payloadStart, stsd.payloadEnd),
   };
 
-  const peaks = computeM4aPeaksFromSamples(sampleSizes, durationSec);
+  const peaks = computeM4aPeaks(bytes, sampleOffsets, sampleSizes, durationSec);
 
   return {
     format: 'm4a',
@@ -1956,6 +1956,94 @@ function computeMp3PeaksFromFrames(bytes, frameOffsets, frameCount, duration) {
   return peaks;
 }
 
+/**
+ * Fast, zero-PCM memory loudness peak computation from M4A (AAC) bitstream.
+ * Directly reads ISO/IEC 14496-3 AAC-LC global_gain quantizer values from frame headers.
+ * Falls back to packet size heuristic if bitstream gains cannot be extracted.
+ */
+function computeM4aPeaks(bytes, sampleOffsets, sampleSizes, duration) {
+  const windowSec = 0.05;
+  const totalWindows = Math.max(1, Math.ceil(duration / windowSec));
+  const peaks = new Float32Array(totalWindows);
+  peaks.fill(-60);
+
+  const sampleCount = sampleSizes ? sampleSizes.length : 0;
+  if (sampleCount === 0 || !sampleOffsets) return peaks;
+
+  const sampleDuration = duration / sampleCount;
+
+  function parseAacGain(off, size) {
+    if (size < 4 || off + size > bytes.length) return 0;
+    let bitPos = off * 8;
+    function readBits(n) {
+      let val = 0;
+      for (let b = 0; b < n; b++) {
+        const byteIdx = bitPos >> 3;
+        const bitInByte = 7 - (bitPos & 7);
+        val = (val << 1) | ((bytes[byteIdx] >> bitInByte) & 1);
+        bitPos++;
+      }
+      return val;
+    }
+    const elemId = readBits(3);
+    if (elemId === 1) { // CPE (channel_pair_element)
+      readBits(4); // element_instance_tag
+      const cw = readBits(1); // common_window
+      if (cw) {
+        readBits(1); // ics_reserved_bit
+        const winSeq = readBits(2);
+        readBits(1); // window_shape
+        let maxSfb = 0;
+        let numGroups = 1;
+        if (winSeq === 2) { // EIGHT_SHORT_SEQUENCE
+          maxSfb = readBits(4);
+          const grouping = readBits(7);
+          for (let g = 0; g < 7; g++) {
+            if (((grouping >> (6 - g)) & 1) === 0) numGroups++;
+          }
+        } else {
+          maxSfb = readBits(6);
+          readBits(1); // predictor_data_present
+        }
+        const msMask = readBits(2);
+        if (msMask === 1) {
+          bitPos += numGroups * maxSfb;
+        }
+      }
+      return readBits(8); // global_gain of channel 0
+    } else if (elemId === 0) { // SCE (single_channel_element)
+      readBits(4); // element_instance_tag
+      return readBits(8); // global_gain
+    }
+    return 0;
+  }
+
+  let validGainCount = 0;
+  for (let i = 0; i < sampleCount; i++) {
+    const gain = parseAacGain(sampleOffsets[i], sampleSizes[i]);
+    if (gain > 0) validGainCount++;
+    let db = -60;
+    if (gain > 0) {
+      // Map AAC global_gain (typically 96-180) to calibrated dB scale (-60 dB to 0 dB)
+      db = Math.max(-60, Math.min(0, (gain - 155) * 0.875 - 25));
+    }
+
+    const t = i * sampleDuration;
+    const w = Math.floor(t / windowSec);
+    if (w < totalWindows) {
+      if (db > peaks[w]) {
+        peaks[w] = db;
+      }
+    }
+  }
+
+  if (validGainCount < sampleCount * 0.1) {
+    return computeM4aPeaksFromSamples(sampleSizes, duration);
+  }
+
+  return peaks;
+}
+
 function computeM4aPeaksFromSamples(sampleSizes, duration) {
   const windowSec = 0.05;
   const totalWindows = Math.max(1, Math.ceil(duration / windowSec));
@@ -2024,7 +2112,7 @@ async function computePeaks() {
     if (state.index.peaks && state.index.peaks.length > 0) {
       peaks = state.index.peaks;
     } else if (state.index.format === 'm4a') {
-      peaks = computeM4aPeaksFromSamples(state.index.sampleSizes, state.index.duration);
+      peaks = computeM4aPeaks(new Uint8Array(state.file.buffer), state.index.sampleOffsets, state.index.sampleSizes, state.index.duration);
     } else {
       const bytes = new Uint8Array(state.file.buffer);
       peaks = computeMp3PeaksFromFrames(bytes, state.index.frameOffsets, state.index.frameCount, state.index.duration);
