@@ -162,9 +162,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--md-sys-color-primary);
-  color: var(--md-sys-color-on-primary);
-  box-shadow: var(--elevation-1);
+  background: linear-gradient(135deg, #C084FC 0%, #9333EA 50%, #6B21A8 100%);
+  color: #FFFFFF;
+  box-shadow: 0 4px 14px rgba(147, 51, 234, 0.4);
 }
 
 .app-title {
