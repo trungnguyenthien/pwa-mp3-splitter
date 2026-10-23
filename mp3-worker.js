@@ -34,6 +34,7 @@ self.onmessage = function (event) {
     self.postMessage({
       type: 'error',
       action,
+      id: payload ? payload.id : undefined,
       error: error.message || String(error),
     });
   }
@@ -300,7 +301,7 @@ function indexM4a(buffer) {
 /**
  * Losslessly slices AAC audio frames and repacks into a clean, compliant M4A file.
  */
-function sliceM4a({ buffer, sampleSizes, timescale, mvhdTimescale, rawAtoms, partName, id }) {
+function sliceM4a({ buffer, sampleSizes, timescale, mvhdTimescale, rawAtoms, partName, id, metadata }) {
   const audioBytes = new Uint8Array(buffer);
   const numSamples = sampleSizes.length;
 
@@ -360,7 +361,7 @@ function sliceM4a({ buffer, sampleSizes, timescale, mvhdTimescale, rawAtoms, par
   }
   const newTkhd = packAtom('tkhd', tkhdPayload);
 
-  const udtaBytes = makeMetaUdta(payload.metadata || partName);
+  const udtaBytes = makeMetaUdta(metadata || partName);
 
   function assembleMoov(mdatOffset) {
     const stcoPayload = new Uint8Array(12);
@@ -836,7 +837,7 @@ function computeM4aPeaksFromSamples(sampleSizes, duration) {
 /**
  * Losslessly extracts frames for a part and prepends a clean ID3v2.3 tag with TIT2.
  */
-function sliceMp3({ buffer, startByte, endByte, partName, id }) {
+function sliceMp3({ buffer, startByte, endByte, partName, id, metadata }) {
   const sourceBytes = new Uint8Array(buffer);
   const safeEndByte = Math.min(endByte, sourceBytes.length);
   const safeStartByte = Math.max(0, startByte);
@@ -848,7 +849,7 @@ function sliceMp3({ buffer, startByte, endByte, partName, id }) {
   const audioSlice = sourceBytes.subarray(safeStartByte, safeEndByte);
 
   // Build ID3v2.3 tag with Title, Artist, Album, Year, and Cover Art (APIC)
-  const meta = Object.assign({}, payload.metadata);
+  const meta = Object.assign({}, metadata);
   if (!meta.title) meta.title = partName || 'Split Part';
   const id3Tag = makeId3v2Tag(meta);
 

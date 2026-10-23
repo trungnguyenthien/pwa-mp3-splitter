@@ -275,7 +275,7 @@ function initWorker() {
 }
 
 function handleWorkerMessage(event) {
-  const { type, index, progress, id, partName, arrayBuffer, error } = event.data;
+  const { type, index, progress, id, partName, arrayBuffer, error, action } = event.data;
 
   if (type === 'indexProgress') {
     const scaled = Math.min(50, Math.round(15 + progress * 0.35));
@@ -298,6 +298,26 @@ function handleWorkerMessage(event) {
       elements.dropzone.classList.remove('hidden');
     }
     if (elements.fileInput) elements.fileInput.disabled = false;
+
+    let updatedPart = false;
+    if (id) {
+      const part = state.parts.find((p) => p.id === id);
+      if (part && part.status === 'working') {
+        part.status = 'error';
+        updatedPart = true;
+      }
+    } else if (action === 'sliceAudio' || action === 'sliceMp3' || action === 'sliceM4a') {
+      state.parts.forEach((p) => {
+        if (p.status === 'working') {
+          p.status = 'error';
+          updatedPart = true;
+        }
+      });
+    }
+    if (updatedPart) {
+      releaseWakeLock();
+      renderParts();
+    }
     
     if (
       error &&
